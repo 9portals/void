@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>The Void</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body {
       background: black;
@@ -11,7 +11,6 @@
       font-family: Arial, sans-serif;
       text-align: center;
       padding: 20px;
-      overflow-x: hidden;
     }
     #messages {
       margin-top: 20px;
@@ -19,7 +18,7 @@
     .message {
       margin: 10px auto;
       padding: 10px;
-      background: rgba(255, 255, 255, 0.05);
+      background: rgba(255,255,255,0.05);
       border-radius: 5px;
       width: 90%;
       max-width: 600px;
@@ -36,7 +35,6 @@
     .timer {
       font-size: 0.8em;
       color: gray;
-      margin-top: 5px;
     }
     button.save-btn {
       background: gray;
@@ -69,7 +67,7 @@
 
 <h1>Welcome to the Void</h1>
 
-<input type="text" id="messageInput" placeholder="Type your message..." style="width: 80%; max-width: 500px; padding: 10px;">
+<input type="text" id="messageInput" placeholder="Type your message..." style="width:80%; max-width:500px; padding:10px;">
 <br><br>
 <button onclick="sendMessage()">Send</button>
 
@@ -78,11 +76,11 @@
 <button id="toggleVault" onclick="toggleVault()">Open Vault</button>
 <div id="vault"></div>
 
-<!-- Firebase Scripts -->
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-  import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, query, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+<!-- Firebase SDKs for browser -->
+<script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore-compat.js"></script>
 
+<script>
   const firebaseConfig = {
     apiKey: "AIzaSyD1YgjFsxh-xZfeHlrxt_0igmH6SBIMcuc",
     authDomain: "void-d9ec4.firebaseapp.com",
@@ -93,11 +91,8 @@
     measurementId: "G-78DGNW8HV3"
   };
 
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-
-  const messagesRef = collection(db, "messages");
-  const vaultRef = collection(db, "vault");
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
 
   function getIP() {
     return localStorage.getItem("userIP") || Math.random().toString(36).substring(2);
@@ -109,40 +104,34 @@
   async function sendMessage() {
     const input = document.getElementById("messageInput");
     const text = input.value.trim();
-    if (text === "") return;
-
-    await addDoc(messagesRef, {
+    if (!text) return;
+    await db.collection("messages").add({
       text: text,
       createdAt: Date.now()
     });
     input.value = "";
   }
 
-  function renderMessage(id, data) {
+  function renderMessage(doc) {
     const div = document.createElement("div");
     div.className = "message";
     div.innerHTML = `
-      <div>${data.text}</div>
-      <div class="timer" id="timer-${id}"></div>
-      <button class="save-btn" onclick="saveToVault('${id}', \`${data.text.replace(/`/g, "\\`")}\`)">Save to Vault</button>
+      <div>${doc.data().text}</div>
+      <div class="timer" id="timer-${doc.id}"></div>
+      <button class="save-btn" onclick="saveToVault('${doc.id}', '${doc.data().text.replace(/'/g, "\\'")}')">Save to Vault</button>
     `;
     document.getElementById("messages").appendChild(div);
 
-    let timeLeft = 60 - Math.floor((Date.now() - data.createdAt) / 1000);
-    if (timeLeft <= 0) {
-      div.remove();
-      deleteDoc(doc(db, "messages", id));
-      return;
-    }
-    updateTimer(id, timeLeft);
+    let timeLeft = 60 - Math.floor((Date.now() - doc.data().createdAt) / 1000);
+    updateTimer(doc.id, timeLeft);
 
     const interval = setInterval(() => {
       timeLeft--;
-      updateTimer(id, timeLeft);
+      updateTimer(doc.id, timeLeft);
       if (timeLeft <= 0) {
         clearInterval(interval);
         div.remove();
-        deleteDoc(doc(db, "messages", id));
+        db.collection("messages").doc(doc.id).delete();
       }
     }, 1000);
   }
@@ -154,25 +143,27 @@
     }
   }
 
-  onSnapshot(messagesRef, (snapshot) => {
-    document.getElementById("messages").innerHTML = "";
-    snapshot.forEach(doc => {
-      renderMessage(doc.id, doc.data());
+  db.collection("messages").orderBy("createdAt")
+    .onSnapshot(snapshot => {
+      document.getElementById("messages").innerHTML = "";
+      snapshot.forEach(doc => {
+        renderMessage(doc);
+      });
     });
-  });
 
   async function saveToVault(messageId, text) {
     const ip = getIP();
+    const q = await db.collection("vault")
+      .where("messageId", "==", messageId)
+      .where("ip", "==", ip)
+      .get();
 
-    const q = query(vaultRef, where("messageId", "==", messageId), where("ip", "==", ip));
-    const snap = await getDocs(q);
-
-    if (!snap.empty) {
+    if (!q.empty) {
       alert("You already saved this message.");
       return;
     }
 
-    await addDoc(vaultRef, {
+    await db.collection("vault").add({
       text: text,
       savedAt: Date.now(),
       ip: ip,
@@ -199,7 +190,7 @@
   async function loadVault() {
     const vault = document.getElementById("vault");
     vault.innerHTML = "<h2>Vault</h2>";
-    const snapshot = await getDocs(vaultRef);
+    const snapshot = await db.collection("vault").orderBy("savedAt", "desc").get();
     snapshot.forEach(doc => {
       const div = document.createElement("div");
       div.className = "message";
