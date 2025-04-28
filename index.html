@@ -90,15 +90,44 @@
   const messagesDiv = document.getElementById('messages');
 
   const liveTimers = {};
+  let currentMessages = [];
+
+  async function sendMessage(text) {
+    if (currentMessages.length >= 10) {
+      // Find the message with least time left
+      let minTimeLeft = Infinity;
+      let messageToDelete = null;
+      const now = Date.now();
+
+      currentMessages.forEach(msg => {
+        const created = msg.data().created.toMillis();
+        const timeLeft = 60 - (now - created) / 1000;
+        if (timeLeft < minTimeLeft) {
+          minTimeLeft = timeLeft;
+          messageToDelete = msg;
+        }
+      });
+
+      if (messageToDelete) {
+        try {
+          await deleteDoc(messageToDelete.ref);
+        } catch (e) {
+          console.error('Error deleting old message', e);
+        }
+      }
+    }
+
+    await addDoc(messagesRef, {
+      text,
+      created: serverTimestamp()
+    });
+  }
 
   document.getElementById('inputForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const text = document.getElementById('messageInput').value.trim();
     if (text) {
-      await addDoc(messagesRef, {
-        text,
-        created: serverTimestamp()
-      });
+      await sendMessage(text);
       document.getElementById('messageInput').value = '';
     }
   });
@@ -106,6 +135,8 @@
   onSnapshot(query(messagesRef, orderBy('created')), (snapshot) => {
     messagesDiv.innerHTML = '';
     const now = Date.now();
+
+    currentMessages = snapshot.docs; // update global array
 
     snapshot.forEach(docSnap => {
       const data = docSnap.data();
