@@ -11,20 +11,32 @@
       font-family: Arial, sans-serif;
       text-align: center;
       padding: 20px;
+      overflow-x: hidden;
     }
     #messages {
       margin-top: 20px;
     }
     .message {
-      margin: 10px 0;
+      margin: 10px auto;
       padding: 10px;
-      background: rgba(255, 255, 255, 0.05); /* soft transparent */
+      background: rgba(255, 255, 255, 0.05);
       border-radius: 5px;
-      transition: all 0.3s ease;
+      width: 90%;
+      max-width: 600px;
+      opacity: 0;
+      transform: translateY(20px);
+      animation: fadeIn 0.5s forwards;
+    }
+    @keyframes fadeIn {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
     .timer {
       font-size: 0.8em;
       color: gray;
+      margin-top: 5px;
     }
     button.save-btn {
       background: gray;
@@ -57,7 +69,8 @@
 
 <h1>Welcome to the Void</h1>
 
-<input type="text" id="messageInput" placeholder="Type your message...">
+<input type="text" id="messageInput" placeholder="Type your message..." style="width: 80%; max-width: 500px; padding: 10px;">
+<br><br>
 <button onclick="sendMessage()">Send</button>
 
 <div id="messages"></div>
@@ -111,12 +124,18 @@
     div.innerHTML = `
       <div>${data.text}</div>
       <div class="timer" id="timer-${id}"></div>
-      <button class="save-btn" onclick="saveToVault('${id}', '${data.text.replace(/'/g, "\\'")}')">Save to Vault</button>
+      <button class="save-btn" onclick="saveToVault('${id}', \`${data.text.replace(/`/g, "\\`")}\`)">Save to Vault</button>
     `;
     document.getElementById("messages").appendChild(div);
 
     let timeLeft = 60 - Math.floor((Date.now() - data.createdAt) / 1000);
+    if (timeLeft <= 0) {
+      div.remove();
+      deleteDoc(doc(db, "messages", id));
+      return;
+    }
     updateTimer(id, timeLeft);
+
     const interval = setInterval(() => {
       timeLeft--;
       updateTimer(id, timeLeft);
