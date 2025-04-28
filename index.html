@@ -32,9 +32,20 @@
       cursor: pointer;
     }
     #vault {
-      margin-top: 50px;
-      border-top: 1px solid white;
-      padding-top: 20px;
+      margin-top: 20px;
+      display: none;
+      background: #111;
+      border: 1px solid #444;
+      padding: 20px;
+      color: #ccc;
+    }
+    button#toggleVault {
+      background: #333;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      margin-top: 20px;
+      cursor: pointer;
     }
   </style>
 </head>
@@ -47,7 +58,7 @@
 
 <div id="messages"></div>
 
-<h2>Vault</h2>
+<button id="toggleVault" onclick="toggleVault()">Show Vault</button>
 <div id="vault"></div>
 
 <!-- Firebase SDKs -->
@@ -70,6 +81,8 @@
   firebase.initializeApp(firebaseConfig);
   const db = firebase.firestore();
 
+  let savedMessages = {}; // track saved message IDs locally
+
   function postMessage() {
     const input = document.getElementById('messageInput');
     const text = input.value.trim();
@@ -82,10 +95,23 @@
     }
   }
 
-  function saveToVault(text) {
-    db.collection("vault").add({
-      text: text,
-      savedAt: firebase.firestore.FieldValue.serverTimestamp()
+  function saveToVault(docId, text) {
+    if (savedMessages[docId]) {
+      alert("You already saved this message.");
+      return;
+    }
+
+    db.collection("vault").where("messageId", "==", docId).get().then(querySnapshot => {
+      if (querySnapshot.empty) {
+        db.collection("vault").add({
+          text: text,
+          savedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          messageId: docId
+        });
+        savedMessages[docId] = true;
+      } else {
+        alert("This message is already saved in the Vault.");
+      }
     });
   }
 
@@ -101,7 +127,7 @@
     div.innerHTML = `
       <p>${doc.data().text}</p>
       <div class="timer" id="timer-${doc.id}">Loading...</div>
-      <button class="save-btn" onclick="saveToVault('${doc.data().text.replace(/'/g, "\\'")}')">Save to Vault</button>
+      <button class="save-btn" onclick="saveToVault('${doc.id}', '${doc.data().text.replace(/'/g, "\\'")}')">Save to Vault</button>
     `;
     messagesDiv.appendChild(div);
 
@@ -117,12 +143,24 @@
         div.remove();
         db.collection("messages").doc(doc.id).delete();
       } else {
-        timerEl.textContent = secondsLeft;
+        timerEl.textContent = secondsLeft + "s left";
       }
     }
 
     updateTimer();
     const timerInterval = setInterval(updateTimer, 1000);
+  }
+
+  function toggleVault() {
+    const vault = document.getElementById('vault');
+    const toggleBtn = document.getElementById('toggleVault');
+    if (vault.style.display === 'none') {
+      vault.style.display = 'block';
+      toggleBtn.textContent = 'Hide Vault';
+    } else {
+      vault.style.display = 'none';
+      toggleBtn.textContent = 'Show Vault';
+    }
   }
 
   // Display live messages
