@@ -23,6 +23,19 @@
       font-size: 0.8em;
       color: gray;
     }
+    button.save-btn {
+      background: gray;
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      margin-top: 5px;
+      cursor: pointer;
+    }
+    #vault {
+      margin-top: 50px;
+      border-top: 1px solid white;
+      padding-top: 20px;
+    }
   </style>
 </head>
 <body>
@@ -34,12 +47,15 @@
 
 <div id="messages"></div>
 
-<!-- Load Firebase SDKs -->
+<h2>Vault</h2>
+<div id="vault"></div>
+
+<!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore-compat.js"></script>
 
 <script>
-  // Your Firebase configuration
+  // Firebase config
   const firebaseConfig = {
     apiKey: "AIzaSyD1YgjFsxh-xZfeHlrxt_0igmH6SBIMcuc",
     authDomain: "void-d9ec4.firebaseapp.com",
@@ -66,6 +82,13 @@
     }
   }
 
+  function saveToVault(text) {
+    db.collection("vault").add({
+      text: text,
+      savedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }
+
   function renderMessage(doc) {
     const messagesDiv = document.getElementById('messages');
     const div = document.createElement('div');
@@ -73,11 +96,12 @@
     div.setAttribute('data-id', doc.id);
 
     const timestamp = doc.data().timestamp?.toDate();
-    if (!timestamp) return; // Skip if no timestamp yet
+    if (!timestamp) return;
 
     div.innerHTML = `
       <p>${doc.data().text}</p>
       <div class="timer" id="timer-${doc.id}">Loading...</div>
+      <button class="save-btn" onclick="saveToVault('${doc.data().text.replace(/'/g, "\\'")}')">Save to Vault</button>
     `;
     messagesDiv.appendChild(div);
 
@@ -101,12 +125,27 @@
     const timerInterval = setInterval(updateTimer, 1000);
   }
 
+  // Display live messages
   db.collection("messages")
     .orderBy("timestamp")
     .onSnapshot(snapshot => {
-      document.getElementById('messages').innerHTML = ''; // Clear to avoid duplicates
+      document.getElementById('messages').innerHTML = '';
       snapshot.forEach(doc => {
         renderMessage(doc);
+      });
+    });
+
+  // Display Vault
+  db.collection("vault")
+    .orderBy("savedAt", "desc")
+    .onSnapshot(snapshot => {
+      const vaultDiv = document.getElementById('vault');
+      vaultDiv.innerHTML = '';
+      snapshot.forEach(doc => {
+        const div = document.createElement('div');
+        div.classList.add('message');
+        div.innerHTML = `<p>${doc.data().text}</p>`;
+        vaultDiv.appendChild(div);
       });
     });
 
