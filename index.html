@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>The Void</title>
   <style>
     body {
@@ -17,7 +18,8 @@
     .message {
       margin: 10px 0;
       padding: 10px;
-      border: 1px solid white;
+      background: rgba(255, 255, 255, 0.05); /* soft transparent */
+      border-radius: 5px;
     }
     .timer {
       font-size: 0.8em;
@@ -35,9 +37,10 @@
       margin-top: 20px;
       display: none;
       background: #111;
-      border: 1px solid #444;
+      border: 1px solid #222;
       padding: 20px;
       color: #ccc;
+      border-radius: 5px;
     }
     button#toggleVault {
       background: #333;
@@ -51,22 +54,21 @@
 </head>
 <body>
 
-<h1>Welcome to The Void</h1>
+<h1>Welcome to the Void</h1>
 
-<input type="text" id="messageInput" placeholder="Say something..." maxlength="100">
-<button onclick="postMessage()">Post</button>
+<input type="text" id="messageInput" placeholder="Type your message...">
+<button onclick="sendMessage()">Send</button>
 
 <div id="messages"></div>
 
-<button id="toggleVault" onclick="toggleVault()">Show Vault</button>
+<button id="toggleVault" onclick="toggleVault()">Open Vault</button>
 <div id="vault"></div>
 
-<!-- Firebase SDKs -->
-<script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore-compat.js"></script>
+<!-- Firebase Scripts -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+  import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, query, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-<script>
-  // Firebase config
   const firebaseConfig = {
     apiKey: "AIzaSyD1YgjFsxh-xZfeHlrxt_0igmH6SBIMcuc",
     authDomain: "void-d9ec4.firebaseapp.com",
@@ -77,116 +79,114 @@
     measurementId: "G-78DGNW8HV3"
   };
 
-  // Initialize Firebase
-  firebase.initializeApp(firebaseConfig);
-  const db = firebase.firestore();
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
 
-  let savedMessages = {}; // track saved message IDs locally
+  const messagesRef = collection(db, "messages");
+  const vaultRef = collection(db, "vault");
 
-  function postMessage() {
-    const input = document.getElementById('messageInput');
+  function getIP() {
+    return localStorage.getItem("userIP") || Math.random().toString(36).substring(2);
+  }
+  if (!localStorage.getItem("userIP")) {
+    localStorage.setItem("userIP", getIP());
+  }
+
+  async function sendMessage() {
+    const input = document.getElementById("messageInput");
     const text = input.value.trim();
-    if (text) {
-      db.collection("messages").add({
-        text: text,
-        timestamp: firebase.firestore.FieldValue.serverTimestamp()
-      });
-      input.value = "";
+    if (text === "") return;
+
+    await addDoc(messagesRef, {
+      text: text,
+      createdAt: Date.now()
+    });
+    input.value = "";
+  }
+
+  function renderMessage(id, data) {
+    const div = document.createElement("div");
+    div.className = "message";
+    div.innerHTML = `
+      <div>${data.text}</div>
+      <div class="timer" id="timer-${id}"></div>
+      <button class="save-btn" onclick="saveToVault('${id}', '${data.text.replace(/'/g, "\\'")}')">Save to Vault</button>
+    `;
+    document.getElementById("messages").appendChild(div);
+
+    let timeLeft = 60 - Math.floor((Date.now() - data.createdAt) / 1000);
+    updateTimer(id, timeLeft);
+    const interval = setInterval(() => {
+      timeLeft--;
+      updateTimer(id, timeLeft);
+      if (timeLeft <= 0) {
+        clearInterval(interval);
+        div.remove();
+        deleteDoc(doc(db, "messages", id));
+      }
+    }, 1000);
+  }
+
+  function updateTimer(id, timeLeft) {
+    const timer = document.getElementById(`timer-${id}`);
+    if (timer) {
+      timer.textContent = `Disappears in ${timeLeft}s`;
     }
   }
 
-  function saveToVault(docId, text) {
-    if (savedMessages[docId]) {
+  onSnapshot(messagesRef, (snapshot) => {
+    document.getElementById("messages").innerHTML = "";
+    snapshot.forEach(doc => {
+      renderMessage(doc.id, doc.data());
+    });
+  });
+
+  async function saveToVault(messageId, text) {
+    const ip = getIP();
+
+    const q = query(vaultRef, where("messageId", "==", messageId), where("ip", "==", ip));
+    const snap = await getDocs(q);
+
+    if (!snap.empty) {
       alert("You already saved this message.");
       return;
     }
 
-    db.collection("vault").where("messageId", "==", docId).get().then(querySnapshot => {
-      if (querySnapshot.empty) {
-        db.collection("vault").add({
-          text: text,
-          savedAt: firebase.firestore.FieldValue.serverTimestamp(),
-          messageId: docId
-        });
-        savedMessages[docId] = true;
-      } else {
-        alert("This message is already saved in the Vault.");
-      }
+    await addDoc(vaultRef, {
+      text: text,
+      savedAt: Date.now(),
+      ip: ip,
+      messageId: messageId
     });
+    alert("Saved to Vault!");
   }
 
-  function renderMessage(doc) {
-    const messagesDiv = document.getElementById('messages');
-    const div = document.createElement('div');
-    div.classList.add('message');
-    div.setAttribute('data-id', doc.id);
-
-    const timestamp = doc.data().timestamp?.toDate();
-    if (!timestamp) return;
-
-    div.innerHTML = `
-      <p>${doc.data().text}</p>
-      <div class="timer" id="timer-${doc.id}">Loading...</div>
-      <button class="save-btn" onclick="saveToVault('${doc.id}', '${doc.data().text.replace(/'/g, "\\'")}')">Save to Vault</button>
-    `;
-    messagesDiv.appendChild(div);
-
-    const timerEl = document.getElementById(`timer-${doc.id}`);
-
-    function updateTimer() {
-      const now = new Date();
-      const secondsPassed = Math.floor((now - timestamp) / 1000);
-      const secondsLeft = 60 - secondsPassed;
-
-      if (secondsLeft <= 0) {
-        clearInterval(timerInterval);
-        div.remove();
-        db.collection("messages").doc(doc.id).delete();
-      } else {
-        timerEl.textContent = secondsLeft + "s left";
-      }
-    }
-
-    updateTimer();
-    const timerInterval = setInterval(updateTimer, 1000);
-  }
+  let vaultOpen = false;
 
   function toggleVault() {
-    const vault = document.getElementById('vault');
-    const toggleBtn = document.getElementById('toggleVault');
-    if (vault.style.display === 'none') {
-      vault.style.display = 'block';
-      toggleBtn.textContent = 'Hide Vault';
+    const vault = document.getElementById("vault");
+    if (!vaultOpen) {
+      vault.style.display = "block";
+      loadVault();
+      document.getElementById("toggleVault").innerText = "Close Vault";
     } else {
-      vault.style.display = 'none';
-      toggleBtn.textContent = 'Show Vault';
+      vault.style.display = "none";
+      document.getElementById("toggleVault").innerText = "Open Vault";
     }
+    vaultOpen = !vaultOpen;
   }
 
-  // Display live messages
-  db.collection("messages")
-    .orderBy("timestamp")
-    .onSnapshot(snapshot => {
-      document.getElementById('messages').innerHTML = '';
-      snapshot.forEach(doc => {
-        renderMessage(doc);
-      });
+  async function loadVault() {
+    const vault = document.getElementById("vault");
+    vault.innerHTML = "<h2>Vault</h2>";
+    const snapshot = await getDocs(vaultRef);
+    snapshot.forEach(doc => {
+      const div = document.createElement("div");
+      div.className = "message";
+      div.innerText = doc.data().text;
+      vault.appendChild(div);
     });
-
-  // Display Vault
-  db.collection("vault")
-    .orderBy("savedAt", "desc")
-    .onSnapshot(snapshot => {
-      const vaultDiv = document.getElementById('vault');
-      vaultDiv.innerHTML = '';
-      snapshot.forEach(doc => {
-        const div = document.createElement('div');
-        div.classList.add('message');
-        div.innerHTML = `<p>${doc.data().text}</p>`;
-        vaultDiv.appendChild(div);
-      });
-    });
-
+  }
 </script>
 
 </body>
