@@ -2,71 +2,64 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <title>The Void</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Void</title>
   <style>
     body {
-      margin: 0;
-      font-family: 'Courier New', monospace;
-      background-color: #000;
-      color: #ccc;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      min-height: 100vh;
-      padding: 10px;
+      background: black;
+      color: white;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 20px;
     }
-    #void, #vault {
-      width: 100%;
-      max-width: 600px;
+    #messages {
       margin-top: 20px;
     }
-    #messages, #vaultMessages {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      margin-top: 10px;
-    }
-    .message, .vault-message {
-      background: rgba(255, 255, 255, 0.05);
+    .message {
+      margin: 10px auto;
       padding: 10px;
+      background: rgba(255,255,255,0.05);
       border-radius: 5px;
-      position: relative;
+      width: 90%;
+      max-width: 600px;
+      opacity: 0;
+      transform: translateY(20px);
+      animation: fadeIn 0.5s forwards;
+    }
+    @keyframes fadeIn {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
     .timer {
-      position: absolute;
-      top: 5px;
-      right: 10px;
-      font-size: 12px;
-      color: #888;
+      font-size: 0.8em;
+      color: gray;
     }
-    #inputForm {
-      margin-top: 20px;
-      display: flex;
-      gap: 10px;
-    }
-    input, button {
-      padding: 10px;
-      background: #111;
-      color: #ccc;
-      border: 1px solid #333;
-      border-radius: 5px;
-    }
-    button:hover {
-      background: #222;
+    button.save-btn {
+      background: gray;
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      margin-top: 5px;
       cursor: pointer;
-    }
-    #authSection {
-      margin-top: 10px;
-    }
-    #vaultToggle {
-      margin-top: 20px;
-      cursor: pointer;
-      color: #aaa;
-      font-size: 14px;
     }
     #vault {
+      margin-top: 20px;
       display: none;
+      background: #111;
+      border: 1px solid #222;
+      padding: 20px;
+      color: #ccc;
+      border-radius: 5px;
+    }
+    button#toggleVault {
+      background: #333;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      margin-top: 20px;
+      cursor: pointer;
     }
   </style>
 </head>
@@ -74,32 +67,20 @@
 
 <h1>Welcome to the Void</h1>
 
-<div id="authSection">
-  <button id="loginBtn">Login / Register</button>
-  <button id="logoutBtn" style="display:none;">Logout</button>
-</div>
+<input type="text" id="messageInput" placeholder="Type your message..." style="width:80%; max-width:500px; padding:10px;">
+<br><br>
+<button onclick="sendMessage()">Send</button>
 
-<div id="void">
-  <form id="inputForm">
-    <input type="text" id="messageInput" placeholder="Speak into the void..." required>
-    <button type="submit">Send</button>
-  </form>
-  <div id="messages"></div>
-</div>
+<div id="messages"></div>
 
-<div id="vaultToggle">[+] Open Vault</div>
-<div id="vault">
-  <h2>Your Vault</h2>
-  <div id="vaultMessages"></div>
-</div>
+<button id="toggleVault" onclick="toggleVault()">Open Vault</button>
+<div id="vault"></div>
 
-<!-- Firebase SDK -->
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-  import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, query, orderBy, serverTimestamp, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+<!-- Firebase SDKs for browser -->
+<script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore-compat.js"></script>
 
-  // Your Firebase Config
+<script>
   const firebaseConfig = {
     apiKey: "AIzaSyD1YgjFsxh-xZfeHlrxt_0igmH6SBIMcuc",
     authDomain: "void-d9ec4.firebaseapp.com",
@@ -110,141 +91,113 @@
     measurementId: "G-78DGNW8HV3"
   };
 
-  // Initialize
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-  const auth = getAuth(app);
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
 
-  const messagesRef = collection(db, "voidMessages");
-  const vaultRef = collection(db, "vault");
-
-  const messagesDiv = document.getElementById('messages');
-  const vaultDiv = document.getElementById('vaultMessages');
-  const loginBtn = document.getElementById('loginBtn');
-  const logoutBtn = document.getElementById('logoutBtn');
-  const vaultToggle = document.getElementById('vaultToggle');
-  const vaultSection = document.getElementById('vault');
-
-  let currentUser = null;
-
-  // Send Message to Void
-  document.getElementById('inputForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const text = document.getElementById('messageInput').value.trim();
-    if (text) {
-      await addDoc(messagesRef, {
-        text,
-        created: serverTimestamp()
-      });
-      document.getElementById('messageInput').value = '';
-    }
-  });
-
-  // Display Messages with countdown
-  onSnapshot(query(messagesRef, orderBy('created')), (snapshot) => {
-    messagesDiv.innerHTML = '';
-    const now = Date.now();
-    snapshot.forEach(docSnap => {
-      const data = docSnap.data();
-      if (!data.created) return;
-      const elapsed = (now - data.created.toMillis()) / 1000;
-      const remaining = 60 - elapsed;
-      if (remaining > 0) {
-        const div = document.createElement('div');
-        div.className = 'message';
-        div.innerHTML = `
-          ${data.text}
-          <div class="timer">${Math.floor(remaining)}s</div>
-          ${currentUser ? `<button onclick="saveToVault('${docSnap.id}', '${encodeURIComponent(data.text)}')">Save</button>` : ''}
-        `;
-        messagesDiv.appendChild(div);
-
-        setTimeout(async () => {
-          if (docSnap.ref) {
-            try { await deleteDoc(docSnap.ref); } catch (e) {}
-          }
-        }, remaining * 1000);
-      }
-    });
-  });
-
-  // Save to Vault
-  window.saveToVault = async (id, text) => {
-    if (!currentUser) return;
-    const q = query(vaultRef, where('userId', '==', currentUser.uid), where('text', '==', decodeURIComponent(text)));
-    const snap = await getDocs(q);
-    if (snap.empty) {
-      await addDoc(vaultRef, {
-        userId: currentUser.uid,
-        text: decodeURIComponent(text),
-        saved: serverTimestamp()
-      });
-    }
-  };
-
-  // Load Vault
-  function loadVault() {
-    if (!currentUser) return;
-    onSnapshot(query(vaultRef, where('userId', '==', currentUser.uid), orderBy('saved')), (snapshot) => {
-      vaultDiv.innerHTML = '';
-      snapshot.forEach(docSnap => {
-        const data = docSnap.data();
-        const div = document.createElement('div');
-        div.className = 'vault-message';
-        div.innerHTML = `
-          ${data.text}
-          <button onclick="deleteVaultMessage('${docSnap.id}')">Delete</button>
-        `;
-        vaultDiv.appendChild(div);
-      });
-    });
+  function getIP() {
+    return localStorage.getItem("userIP") || Math.random().toString(36).substring(2);
+  }
+  if (!localStorage.getItem("userIP")) {
+    localStorage.setItem("userIP", getIP());
   }
 
-  // Delete Vault Message
-  window.deleteVaultMessage = async (id) => {
-    await deleteDoc(doc(db, "vault", id));
-  };
+  async function sendMessage() {
+    const input = document.getElementById("messageInput");
+    const text = input.value.trim();
+    if (!text) return;
+    await db.collection("messages").add({
+      text: text,
+      createdAt: Date.now()
+    });
+    input.value = "";
+  }
 
-  // Auth
-  loginBtn.addEventListener('click', async () => {
-    const email = prompt("Enter Email:");
-    const password = prompt("Enter Password:");
-    if (email && password) {
-      try {
-        await signInWithEmailAndPassword(auth, email, password);
-      } catch (e) {
-        await createUserWithEmailAndPassword(auth, email, password);
+  function renderMessage(doc) {
+    const div = document.createElement("div");
+    div.className = "message";
+    div.innerHTML = `
+      <div>${doc.data().text}</div>
+      <div class="timer" id="timer-${doc.id}"></div>
+      <button class="save-btn" onclick="saveToVault('${doc.id}', '${doc.data().text.replace(/'/g, "\\'")}')">Save to Vault</button>
+    `;
+    document.getElementById("messages").appendChild(div);
+
+    let timeLeft = 60 - Math.floor((Date.now() - doc.data().createdAt) / 1000);
+    updateTimer(doc.id, timeLeft);
+
+    const interval = setInterval(() => {
+      timeLeft--;
+      updateTimer(doc.id, timeLeft);
+      if (timeLeft <= 0) {
+        clearInterval(interval);
+        div.remove();
+        db.collection("messages").doc(doc.id).delete();
       }
+    }, 1000);
+  }
+
+  function updateTimer(id, timeLeft) {
+    const timer = document.getElementById(`timer-${id}`);
+    if (timer) {
+      timer.textContent = `Disappears in ${timeLeft}s`;
     }
-  });
+  }
 
-  logoutBtn.addEventListener('click', () => {
-    signOut(auth);
-  });
+  db.collection("messages").orderBy("createdAt")
+    .onSnapshot(snapshot => {
+      document.getElementById("messages").innerHTML = "";
+      snapshot.forEach(doc => {
+        renderMessage(doc);
+      });
+    });
 
-  onAuthStateChanged(auth, (user) => {
-    currentUser = user;
-    if (user) {
-      loginBtn.style.display = 'none';
-      logoutBtn.style.display = 'inline-block';
+  async function saveToVault(messageId, text) {
+    const ip = getIP();
+    const q = await db.collection("vault")
+      .where("messageId", "==", messageId)
+      .where("ip", "==", ip)
+      .get();
+
+    if (!q.empty) {
+      alert("You already saved this message.");
+      return;
+    }
+
+    await db.collection("vault").add({
+      text: text,
+      savedAt: Date.now(),
+      ip: ip,
+      messageId: messageId
+    });
+    alert("Saved to Vault!");
+  }
+
+  let vaultOpen = false;
+
+  function toggleVault() {
+    const vault = document.getElementById("vault");
+    if (!vaultOpen) {
+      vault.style.display = "block";
       loadVault();
+      document.getElementById("toggleVault").innerText = "Close Vault";
     } else {
-      loginBtn.style.display = 'inline-block';
-      logoutBtn.style.display = 'none';
-      vaultDiv.innerHTML = '';
+      vault.style.display = "none";
+      document.getElementById("toggleVault").innerText = "Open Vault";
     }
-  });
+    vaultOpen = !vaultOpen;
+  }
 
-  // Toggle Vault
-  vaultToggle.addEventListener('click', () => {
-    if (vaultSection.style.display === 'none') {
-      vaultSection.style.display = 'block';
-      vaultToggle.textContent = "[-] Close Vault";
-    } else {
-      vaultSection.style.display = 'none';
-      vaultToggle.textContent = "[+] Open Vault";
-    }
-  });
+  async function loadVault() {
+    const vault = document.getElementById("vault");
+    vault.innerHTML = "<h2>Vault</h2>";
+    const snapshot = await db.collection("vault").orderBy("savedAt", "desc").get();
+    snapshot.forEach(doc => {
+      const div = document.createElement("div");
+      div.className = "message";
+      div.innerText = doc.data().text;
+      vault.appendChild(div);
+    });
+  }
 </script>
 
 </body>
