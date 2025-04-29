@@ -8,50 +8,70 @@
     body {
       margin: 0;
       font-family: Arial, sans-serif;
-      background: black;
+      background-color: #000;
       color: #ccc;
-      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
     }
+
     header {
-      padding: 20px;
-      background: #111;
+      width: 100%;
+      padding: 15px 0;
+      background-color: #111;
+      text-align: center;
       font-size: 24px;
+      font-weight: bold;
+      color: #eee;
+      border-bottom: 1px solid #333;
     }
+
     nav {
-      margin: 20px;
+      display: flex;
+      gap: 15px;
+      justify-content: center;
+      margin: 20px auto;
     }
-    nav a {
-      margin: 0 10px;
+
+    nav a, nav span {
       color: #ccc;
       text-decoration: none;
-      border: 1px solid #444;
       padding: 8px 16px;
+      border: 1px solid #333;
       border-radius: 5px;
+      background-color: #111;
     }
+
     nav a:hover {
-      background: #222;
+      background-color: #222;
+    }
+
+    #content {
+      margin-top: 30px;
+      text-align: center;
     }
   </style>
 </head>
 <body>
-
-  <header>
-    <a href="index.html" style="color: inherit; text-decoration: none;">Void</a>
-  </header>
+  <header onclick="window.location.href='index.html'">Void</header>
 
   <nav id="navLinks">
-    <a href="login.html">Login</a>
-    <a href="signup.html">Sign Up</a>
+    <!-- Dynamic links populated by Firebase Auth -->
   </nav>
 
-  <main>
-    <h2>Welcome to the Void</h2>
-    <p>Chat, connect, or vanish into nothingness...</p>
-  </main>
+  <div id="content">
+    <h2>Welcome to The Void</h2>
+    <p>A place to speak freely. Sign up to create a profile or join the chat anonymously.</p>
+  </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import {
+      getAuth,
+      onAuthStateChanged,
+      signOut
+    } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyD1YgjFsxh-xZfeHlrxt_0igmH6SBIMcuc",
@@ -60,22 +80,65 @@
       storageBucket: "void-d9ec4.appspot.com",
       messagingSenderId: "267268035851",
       appId: "1:267268035851:web:d535fe4175c06f170f3e0e",
+      measurementId: "G-78DGNW8HV3"
     };
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
 
-    const nav = document.getElementById("navLinks");
+    const navLinks = document.getElementById("navLinks");
+
+    function setNav(loggedIn, user) {
+      navLinks.innerHTML = "";
+
+      if (loggedIn) {
+        const logoutBtn = document.createElement("a");
+        logoutBtn.href = "#";
+        logoutBtn.textContent = "Logout";
+        logoutBtn.onclick = async () => {
+          await signOut(auth);
+          location.reload();
+        };
+
+        const editProfile = document.createElement("a");
+        editProfile.href = "edit-profile.html";
+        editProfile.textContent = "Edit Profile";
+
+        const viewProfiles = document.createElement("a");
+        viewProfiles.href = "view-profiles.html";
+        viewProfiles.textContent = "View Profiles";
+
+        const chat = document.createElement("a");
+        chat.href = "chat.html";
+        chat.textContent = "Global Chat";
+
+        navLinks.append(viewProfiles, chat, editProfile, logoutBtn);
+      } else {
+        const login = document.createElement("a");
+        login.href = "login.html";
+        login.textContent = "Login";
+
+        const signup = document.createElement("a");
+        signup.href = "signup.html";
+        signup.textContent = "Sign Up";
+
+        const viewProfiles = document.createElement("a");
+        viewProfiles.href = "view-profiles.html";
+        viewProfiles.textContent = "View Profiles";
+
+        const chat = document.createElement("a");
+        chat.href = "chat.html";
+        chat.textContent = "Global Chat";
+
+        navLinks.append(viewProfiles, chat, login, signup);
+      }
+    }
 
     onAuthStateChanged(auth, (user) => {
       if (user && user.emailVerified) {
-        nav.innerHTML = `
-          <a href="edit-profile.html">Edit Profile</a>
-          <a href="#" id="logoutBtn">Logout</a>
-        `;
-        document.getElementById("logoutBtn")?.addEventListener("click", () => {
-          signOut(auth).then(() => location.reload());
-        });
+        setNav(true, user);
+      } else {
+        setNav(false);
       }
     });
   </script>
