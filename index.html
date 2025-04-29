@@ -17,18 +17,14 @@
       padding: 20px;
     }
     h1 {
-      margin-bottom: 20px;
+      margin-bottom: 10px;
     }
-    #authControls {
+    #authInfo {
       position: absolute;
-      top: 20px;
+      top: 10px;
       right: 20px;
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-    }
-    #authControls span {
-      margin-bottom: 5px;
+      font-size: 14px;
+      color: #ccc;
     }
     #inputForm {
       display: flex;
@@ -66,34 +62,24 @@
       font-size: 12px;
       color: #888;
     }
-    #authModal {
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0, 0, 0, 0.85);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-    }
-    #authModalContent {
-      background: #111;
-      padding: 20px;
-      border: 1px solid #333;
-      border-radius: 10px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-    #authModalContent input {
-      width: 100%;
+    #authControls {
+      margin-bottom: 20px;
     }
   </style>
 </head>
 <body>
 
-<div id="authControls"></div>
-
 <h1>Welcome to the Void</h1>
+<div id="authInfo"></div>
+
+<div id="authControls">
+  <input type="email" id="email" placeholder="Email" />
+  <input type="password" id="password" placeholder="Password" />
+  <input type="text" id="username" placeholder="Username (sign up only)" />
+  <button id="signupBtn">Sign Up</button>
+  <button id="loginBtn">Login</button>
+  <button id="logoutBtn" style="display: none;">Logout</button>
+</div>
 
 <form id="inputForm">
   <input type="text" id="messageInput" placeholder="Speak into the void..." required />
@@ -102,20 +88,17 @@
 
 <div id="messages"></div>
 
-<div id="authModal" style="display: none;">
-  <div id="authModalContent">
-    <input type="email" id="email" placeholder="Email" />
-    <input type="password" id="password" placeholder="Password" />
-    <input type="text" id="username" placeholder="Username (only for signup)" />
-    <button onclick="signUp()">Sign Up</button>
-    <button onclick="logIn()">Log In</button>
-  </div>
-</div>
-
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-  import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, query, orderBy, serverTimestamp, getDocs, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+  import {
+    getFirestore, collection, addDoc, onSnapshot,
+    deleteDoc, doc, query, orderBy, serverTimestamp,
+    getDocs, setDoc
+  } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+  import {
+    getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+    signOut, onAuthStateChanged
+  } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyD1YgjFsxh-xZfeHlrxt_0igmH6SBIMcuc",
@@ -129,99 +112,79 @@
 
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
-  const auth = getAuth();
+  const auth = getAuth(app);
 
   const messagesRef = collection(db, "voidMessages");
-  const usersRef = collection(db, "users");
-  const messagesDiv = document.getElementById('messages');
-  const authControls = document.getElementById('authControls');
-  const authModal = document.getElementById('authModal');
+  const usernamesRef = collection(db, "usernames");
 
+  const messagesDiv = document.getElementById("messages");
+  const authInfo = document.getElementById("authInfo");
   const liveTimers = {};
   let currentMessages = [];
   let currentUser = null;
+  let currentUsername = "";
 
-  function showAuthModal() {
-    authModal.style.display = 'flex';
-  }
-
-  async function signUp() {
-    const email = document.getElementById("email").value.trim();
-    const password = document.getElementById("password").value.trim();
-    const username = document.getElementById("username").value.trim();
-
-    if (!email || !password || !username) return alert("Fill all fields");
-
-    // Check if username exists
-    const usernameDoc = doc(db, "usernames", username);
-    const usernameSnap = await getDocs(usersRef);
-    let exists = false;
-    usernameSnap.forEach(doc => {
-      if (doc.data().username === username) exists = true;
-    });
-    if (exists) return alert("Username already taken");
-
-    try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      await setDoc(doc(usersRef, userCredential.user.uid), { username });
-      await setDoc(doc(db, "usernames", username), { uid: userCredential.user.uid });
-      authModal.style.display = 'none';
-    } catch (err) {
-      alert(err.message);
+  const updateAuthInfo = () => {
+    if (currentUser) {
+      authInfo.textContent = `Logged in as: ${currentUsername}`;
+      document.getElementById("logoutBtn").style.display = "inline-block";
+    } else {
+      authInfo.textContent = "";
+      document.getElementById("logoutBtn").style.display = "none";
     }
-  }
+  };
 
-  async function logIn() {
-    const email = document.getElementById("email").value.trim();
-    const password = document.getElementById("password").value.trim();
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-      authModal.style.display = 'none';
-    } catch (err) {
-      alert(err.message);
-    }
-  }
-
-  document.getElementById('inputForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const text = document.getElementById('messageInput').value.trim();
-    if (text) {
-      if (currentMessages.length >= 10) {
-        let minTimeLeft = Infinity;
-        let messageToDelete = null;
-        const now = Date.now();
-        currentMessages.forEach(msg => {
-          const created = msg.data().created?.toMillis?.() || 0;
-          const timeLeft = 60 - (now - created) / 1000;
-          if (timeLeft < minTimeLeft) {
-            minTimeLeft = timeLeft;
-            messageToDelete = msg;
-          }
-        });
-        if (messageToDelete) await deleteDoc(messageToDelete.ref);
-      }
-
-      let username = "Anonymous";
-      if (currentUser) {
-        const userDoc = await getDocs(usersRef);
-        userDoc.forEach(doc => {
-          if (doc.id === currentUser.uid && doc.data().username) {
-            username = doc.data().username;
-          }
-        });
-      }
-
-      await addDoc(messagesRef, {
-        text,
-        username,
-        created: serverTimestamp()
+  onAuthStateChanged(auth, async (user) => {
+    currentUser = user;
+    if (user) {
+      const snap = await getDocs(usernamesRef);
+      snap.forEach(doc => {
+        if (doc.data().uid === user.uid) {
+          currentUsername = doc.id;
+        }
       });
-      document.getElementById('messageInput').value = '';
+    } else {
+      currentUsername = "";
+    }
+    updateAuthInfo();
+  });
+
+  async function sendMessage(text) {
+    if (currentMessages.length >= 10) {
+      let minTimeLeft = Infinity;
+      let messageToDelete = null;
+      const now = Date.now();
+      currentMessages.forEach(msg => {
+        const created = msg.data().created.toMillis();
+        const timeLeft = 60 - (now - created) / 1000;
+        if (timeLeft < minTimeLeft) {
+          minTimeLeft = timeLeft;
+          messageToDelete = msg;
+        }
+      });
+      if (messageToDelete) {
+        try { await deleteDoc(messageToDelete.ref); } catch (e) { }
+      }
+    }
+
+    await addDoc(messagesRef, {
+      text,
+      username: currentUsername || null,
+      created: serverTimestamp()
+    });
+  }
+
+  document.getElementById("inputForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const text = document.getElementById("messageInput").value.trim();
+    if (text) {
+      await sendMessage(text);
+      document.getElementById("messageInput").value = "";
     }
   });
 
-  onSnapshot(query(messagesRef, orderBy('created')), (snapshot) => {
-    messagesDiv.innerHTML = '';
+  onSnapshot(query(messagesRef, orderBy("created")), (snapshot) => {
+    messagesDiv.innerHTML = "";
     const now = Date.now();
     currentMessages = snapshot.docs;
 
@@ -234,13 +197,14 @@
       const remaining = 60 - elapsed;
 
       if (remaining > 0) {
-        const div = document.createElement('div');
-        div.className = 'message';
-        const timerDiv = document.createElement('div');
-        timerDiv.className = 'timer';
+        const div = document.createElement("div");
+        div.className = "message";
+        const timerDiv = document.createElement("div");
+        timerDiv.className = "timer";
         timerDiv.innerText = `${Math.floor(remaining)}s`;
 
-        div.innerHTML = `<strong>${data.username || "Anonymous"}</strong>: ${data.text}`;
+        const userDisplay = data.username ? `<strong>${data.username}</strong>: ` : "";
+        div.innerHTML = `${userDisplay}${data.text}`;
         div.appendChild(timerDiv);
         messagesDiv.appendChild(div);
 
@@ -259,33 +223,49 @@
     });
   });
 
-  onAuthStateChanged(auth, async (user) => {
-    currentUser = user;
-    authControls.innerHTML = '';
+  document.getElementById("signupBtn").addEventListener("click", async () => {
+    const email = document.getElementById("email").value.trim();
+    const password = document.getElementById("password").value.trim();
+    const username = document.getElementById("username").value.trim();
 
-    if (user) {
-      const userDoc = await getDocs(usersRef);
-      let name = "User";
-      userDoc.forEach(doc => {
-        if (doc.id === user.uid && doc.data().username) {
-          name = doc.data().username;
-        }
-      });
+    if (!email || !password || !username) {
+      alert("All fields are required to sign up.");
+      return;
+    }
 
-      const span = document.createElement('span');
-      span.textContent = `Logged in as: ${name}`;
-      const logoutBtn = document.createElement('button');
-      logoutBtn.textContent = 'Logout';
-      logoutBtn.onclick = () => signOut(auth);
-      authControls.appendChild(span);
-      authControls.appendChild(logoutBtn);
-    } else {
-      const loginBtn = document.createElement('button');
-      loginBtn.textContent = 'Login / Sign Up';
-      loginBtn.onclick = () => showAuthModal();
-      authControls.appendChild(loginBtn);
+    const usernameSnap = await getDocs(usernamesRef);
+    let exists = false;
+    usernameSnap.forEach(doc => {
+      if (doc.id === username) exists = true;
+    });
+
+    if (exists) {
+      alert("Username already taken.");
+      return;
+    }
+
+    try {
+      const userCred = await createUserWithEmailAndPassword(auth, email, password);
+      await setDoc(doc(usernamesRef, username), { uid: userCred.user.uid });
+    } catch (e) {
+      alert("Sign up failed: " + e.message);
     }
   });
+
+  document.getElementById("loginBtn").addEventListener("click", async () => {
+    const email = document.getElementById("email").value.trim();
+    const password = document.getElementById("password").value.trim();
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+    } catch (e) {
+      alert("Login failed: " + e.message);
+    }
+  });
+
+  document.getElementById("logoutBtn").addEventListener("click", async () => {
+    await signOut(auth);
+  });
 </script>
+
 </body>
 </html>
