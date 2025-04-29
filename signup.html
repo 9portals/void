@@ -1,53 +1,35 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8" />
   <title>Sign Up</title>
   <style>
     body {
-      background-color: #000;
-      color: #ccc;
-      font-family: Arial;
-      padding: 50px;
+      background: black;
+      color: white;
+      font-family: sans-serif;
+      text-align: center;
+      padding-top: 60px;
     }
-    form {
-      max-width: 400px;
-      margin: auto;
-    }
-    input {
-      display: block;
-      margin-bottom: 15px;
+    input, button {
+      margin: 10px;
       padding: 10px;
-      width: 100%;
-      background: #111;
-      border: 1px solid #333;
-      color: #ccc;
-    }
-    button {
-      padding: 10px;
-      background: #222;
-      border: none;
-      color: #ccc;
-      cursor: pointer;
-    }
-    .error {
-      color: red;
+      width: 250px;
     }
   </style>
 </head>
 <body>
   <h2>Sign Up</h2>
   <form id="signupForm">
-    <input type="text" id="username" placeholder="Username (min 6 chars)" required />
-    <input type="email" id="email" placeholder="Email" required />
-    <input type="password" id="password" placeholder="Password (min 8 chars)" required />
-    <button type="submit">Sign Up</button>
-    <div class="error" id="errorMsg"></div>
+    <input type="text" id="username" placeholder="Username (min 6 chars)" required><br>
+    <input type="email" id="email" placeholder="Email" required><br>
+    <input type="password" id="password" placeholder="Password (min 8 chars)" required><br>
+    <button type="submit">Register</button>
   </form>
+  <p id="message"></p>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getAuth, createUserWithEmailAndPassword, sendEmailVerification, updateProfile } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
     const firebaseConfig = {
@@ -65,25 +47,29 @@
 
     document.getElementById("signupForm").addEventListener("submit", async (e) => {
       e.preventDefault();
-      const email = document.getElementById("email").value.trim();
-      const password = document.getElementById("password").value.trim();
       const username = document.getElementById("username").value.trim();
-      const errorMsg = document.getElementById("errorMsg");
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+
+      const msg = document.getElementById("message");
 
       if (username.length < 6 || password.length < 8) {
-        errorMsg.textContent = "Username or password too short.";
+        msg.innerText = "Invalid username or password length.";
         return;
       }
 
       try {
         const cred = await createUserWithEmailAndPassword(auth, email, password);
-        await setDoc(doc(db, "users", cred.user.uid), {
-          username,
-          email
-        });
-        window.location.href = "index.html";
-      } catch (error) {
-        errorMsg.textContent = error.message;
+        await updateProfile(cred.user, { displayName: username });
+        await setDoc(doc(db, "users", cred.user.uid), { username, email });
+
+        await sendEmailVerification(cred.user);
+        msg.innerText = "Registered! Please verify your email.";
+        setTimeout(() => window.location.href = "index.html", 3000);
+      } catch (err) {
+        msg.innerText = err.code.includes("email-already-in-use")
+          ? "Email already in use."
+          : "Signup error.";
       }
     });
   </script>
