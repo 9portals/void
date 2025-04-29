@@ -1,36 +1,101 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Sign Up</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sign Up - The Void</title>
   <style>
     body {
-      background: black;
-      color: white;
-      font-family: sans-serif;
-      text-align: center;
-      padding-top: 60px;
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background-color: #000;
+      color: #ccc;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
     }
+
+    header {
+      width: 100%;
+      padding: 15px 0;
+      background-color: #111;
+      text-align: center;
+      font-size: 24px;
+      font-weight: bold;
+      color: #eee;
+      border-bottom: 1px solid #333;
+      cursor: pointer;
+    }
+
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 30px;
+      background-color: #111;
+      border: 1px solid #333;
+      border-radius: 8px;
+      margin-top: 40px;
+      width: 300px;
+    }
+
     input, button {
-      margin: 10px;
       padding: 10px;
-      width: 250px;
+      border-radius: 5px;
+      border: 1px solid #444;
+      background-color: #000;
+      color: #ccc;
+    }
+
+    button:hover {
+      background-color: #222;
+      cursor: pointer;
+    }
+
+    .error {
+      color: #f66;
+      font-size: 14px;
+    }
+
+    .info {
+      font-size: 14px;
+      color: #6c6;
     }
   </style>
 </head>
 <body>
-  <h2>Sign Up</h2>
+  <header onclick="window.location.href='index.html'">Void</header>
+
   <form id="signupForm">
-    <input type="text" id="username" placeholder="Username (min 6 chars)" required><br>
-    <input type="email" id="email" placeholder="Email" required><br>
-    <input type="password" id="password" placeholder="Password (min 8 chars)" required><br>
-    <button type="submit">Register</button>
+    <h2 style="text-align:center;">Create Account</h2>
+    <input type="text" id="username" placeholder="Username (min 6 chars)" required />
+    <input type="email" id="email" placeholder="Email" required />
+    <input type="password" id="password" placeholder="Password (min 8 chars)" required />
+    <button type="submit">Sign Up</button>
+    <div class="error" id="error"></div>
+    <div class="info" id="info"></div>
   </form>
-  <p id="message"></p>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, createUserWithEmailAndPassword, sendEmailVerification, updateProfile } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    import {
+      getAuth,
+      createUserWithEmailAndPassword,
+      sendEmailVerification,
+      signOut
+    } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+    import {
+      getFirestore,
+      doc,
+      setDoc,
+      getDoc,
+      collection,
+      query,
+      where,
+      getDocs
+    } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyD1YgjFsxh-xZfeHlrxt_0igmH6SBIMcuc",
@@ -38,38 +103,76 @@
       projectId: "void-d9ec4",
       storageBucket: "void-d9ec4.appspot.com",
       messagingSenderId: "267268035851",
-      appId: "1:267268035851:web:d535fe4175c06f170f3e0e"
+      appId: "1:267268035851:web:d535fe4175c06f170f3e0e",
+      measurementId: "G-78DGNW8HV3"
     };
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
 
-    document.getElementById("signupForm").addEventListener("submit", async (e) => {
+    const form = document.getElementById("signupForm");
+    const errorDiv = document.getElementById("error");
+    const infoDiv = document.getElementById("info");
+
+    form.addEventListener("submit", async (e) => {
       e.preventDefault();
-      const username = document.getElementById("username").value.trim();
-      const email = document.getElementById("email").value.trim();
-      const password = document.getElementById("password").value;
+      errorDiv.textContent = "";
+      infoDiv.textContent = "";
 
-      const msg = document.getElementById("message");
+      const username = form.username.value.trim();
+      const email = form.email.value.trim();
+      const password = form.password.value;
 
-      if (username.length < 6 || password.length < 8) {
-        msg.innerText = "Invalid username or password length.";
+      if (username.length < 6) {
+        errorDiv.textContent = "Username must be at least 6 characters.";
+        return;
+      }
+
+      if (password.length < 8) {
+        errorDiv.textContent = "Password must be at least 8 characters.";
         return;
       }
 
       try {
-        const cred = await createUserWithEmailAndPassword(auth, email, password);
-        await updateProfile(cred.user, { displayName: username });
-        await setDoc(doc(db, "users", cred.user.uid), { username, email });
+        // Check if username already exists
+        const q = query(collection(db, "users"), where("username", "==", username));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          errorDiv.textContent = "Username already taken.";
+          return;
+        }
 
-        await sendEmailVerification(cred.user);
-        msg.innerText = "Registered! Please verify your email.";
-        setTimeout(() => window.location.href = "index.html", 3000);
+        // Create user
+        const userCred = await createUserWithEmailAndPassword(auth, email, password);
+        const user = userCred.user;
+
+        // Save profile to Firestore
+        await setDoc(doc(db, "users", user.uid), {
+          uid: user.uid,
+          username,
+          email,
+          createdAt: Date.now(),
+          name: "",
+          age: "",
+          gender: "",
+          bio: "",
+          profilePicture: "",
+          lastOnline: Date.now(),
+          followers: [],
+          following: [],
+          visitors: []
+        });
+
+        await sendEmailVerification(user);
+        infoDiv.textContent = "Verification email sent. Please check your inbox.";
+
+        await signOut(auth);
       } catch (err) {
-        msg.innerText = err.code.includes("email-already-in-use")
+        console.error(err);
+        errorDiv.textContent = err.message.includes("auth/email-already-in-use")
           ? "Email already in use."
-          : "Signup error.";
+          : "Something went wrong. Try again.";
       }
     });
   </script>
