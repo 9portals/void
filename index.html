@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>The Void</title>
   <style>
     body {
@@ -20,13 +20,28 @@
       margin-bottom: 10px;
     }
     #authBox {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      text-align: right;
+      margin-bottom: 20px;
+      text-align: center;
     }
     #authBox input {
       margin: 2px;
+      padding: 5px;
+      background: #111;
+      border: 1px solid #333;
+      color: #ccc;
+      border-radius: 5px;
+    }
+    #authBox button {
+      padding: 5px 10px;
+      background: #111;
+      color: #ccc;
+      border: 1px solid #333;
+      border-radius: 5px;
+      margin: 2px;
+    }
+    #authBox button:hover {
+      background: #222;
+      cursor: pointer;
     }
     #inputForm {
       display: flex;
@@ -68,22 +83,23 @@
 </head>
 <body>
 
-<div id="authBox"></div>
-
 <h1>Welcome to the Void</h1>
 
+<div id="authBox"></div>
+
 <form id="inputForm">
-  <input type="text" id="messageInput" placeholder="Speak into the void..." required>
+  <input type="text" id="messageInput" placeholder="Speak into the void..." required />
   <button type="submit">Send</button>
 </form>
 
 <div id="messages"></div>
 
+<!-- Firebase SDK -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
   import {
     getAuth, onAuthStateChanged, createUserWithEmailAndPassword,
-    signInWithEmailAndPassword, signOut
+    signInWithEmailAndPassword, signOut, updateProfile
   } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
   import {
     getFirestore, collection, addDoc, onSnapshot, deleteDoc,
@@ -105,55 +121,62 @@
   const auth = getAuth(app);
 
   const messagesRef = collection(db, "voidMessages");
-  const messagesDiv = document.getElementById('messages');
-  const authBox = document.getElementById('authBox');
+  const messagesDiv = document.getElementById("messages");
+  const authBox = document.getElementById("authBox");
 
   let currentUser = null;
-  const liveTimers = {};
   let currentMessages = [];
 
   function renderAuthUI(user) {
     if (user) {
       authBox.innerHTML = `
         <div>
-          Logged in as <b>${user.displayName || user.email}</b><br>
+          Logged in as <b>${user.displayName || user.email}</b><br />
           <button id="logoutBtn">Logout</button>
         </div>
       `;
-      document.getElementById('logoutBtn').onclick = () => signOut(auth);
+      document.getElementById("logoutBtn").onclick = () => signOut(auth);
     } else {
       authBox.innerHTML = `
         <div>
-          <input id="username" placeholder="Username">
-          <input id="email" placeholder="Email">
-          <input type="password" id="password" placeholder="Password">
+          <input id="username" placeholder="Username" />
+          <input id="email" placeholder="Email" />
+          <input type="password" id="password" placeholder="Password" />
           <button id="registerBtn">Register</button>
           <button id="loginBtn">Login</button>
         </div>
       `;
-      document.getElementById('registerBtn').onclick = async () => {
-        const email = document.getElementById('email').value;
-        const password = document.getElementById('password').value;
-        const username = document.getElementById('username').value;
+
+      document.getElementById("registerBtn").onclick = async () => {
+        const username = document.getElementById("username").value.trim();
+        const email = document.getElementById("email").value.trim();
+        const password = document.getElementById("password").value;
+
+        if (!username || !email || !password) {
+          alert("All fields are required.");
+          return;
+        }
+
         try {
-          const cred = await createUserWithEmailAndPassword(auth, email, password);
-          await setDoc(doc(db, "users", cred.user.uid), {
-            uid: cred.user.uid,
+          const userCred = await createUserWithEmailAndPassword(auth, email, password);
+          await updateProfile(userCred.user, { displayName: username });
+          await setDoc(doc(db, "users", userCred.user.uid), {
+            uid: userCred.user.uid,
             email,
             username
           });
-          await cred.user.updateProfile({ displayName: username });
-        } catch (e) {
-          alert(e.message);
+        } catch (err) {
+          alert("Registration failed: " + err.message);
         }
       };
-      document.getElementById('loginBtn').onclick = async () => {
-        const email = document.getElementById('email').value;
-        const password = document.getElementById('password').value;
+
+      document.getElementById("loginBtn").onclick = async () => {
+        const email = document.getElementById("email").value.trim();
+        const password = document.getElementById("password").value;
         try {
           await signInWithEmailAndPassword(auth, email, password);
-        } catch (e) {
-          alert(e.message);
+        } catch (err) {
+          alert("Login failed: " + err.message);
         }
       };
     }
@@ -164,6 +187,7 @@
       let minTimeLeft = Infinity;
       let messageToDelete = null;
       const now = Date.now();
+
       currentMessages.forEach(msg => {
         const created = msg.data().created?.toMillis?.() || 0;
         const timeLeft = 60 - (now - created) / 1000;
@@ -172,6 +196,7 @@
           messageToDelete = msg;
         }
       });
+
       if (messageToDelete) {
         try {
           await deleteDoc(messageToDelete.ref);
@@ -187,33 +212,34 @@
     });
   }
 
-  document.getElementById('inputForm').addEventListener('submit', async (e) => {
+  document.getElementById("inputForm").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const text = document.getElementById('messageInput').value.trim();
+    const text = document.getElementById("messageInput").value.trim();
     if (text) {
       await sendMessage(text);
-      document.getElementById('messageInput').value = '';
+      document.getElementById("messageInput").value = "";
     }
   });
 
-  onSnapshot(query(messagesRef, orderBy('created')), (snapshot) => {
-    messagesDiv.innerHTML = '';
+  onSnapshot(query(messagesRef, orderBy("created")), (snapshot) => {
+    messagesDiv.innerHTML = "";
     const now = Date.now();
     currentMessages = snapshot.docs;
 
     snapshot.forEach(docSnap => {
       const data = docSnap.data();
       if (!data.created) return;
+
       const createdTime = data.created.toMillis();
       const elapsed = (now - createdTime) / 1000;
       const remaining = 60 - elapsed;
 
       if (remaining > 0) {
-        const div = document.createElement('div');
-        div.className = 'message';
+        const div = document.createElement("div");
+        div.className = "message";
 
-        const timerDiv = document.createElement('div');
-        timerDiv.className = 'timer';
+        const timerDiv = document.createElement("div");
+        timerDiv.className = "timer";
         timerDiv.innerText = `${Math.floor(remaining)}s`;
 
         div.innerHTML = data.username
@@ -227,18 +253,18 @@
           const timeLeft = 60 - (Date.now() - createdTime) / 1000;
           if (timeLeft <= 0) {
             clearInterval(interval);
-            try { await deleteDoc(docSnap.ref); } catch (e) {}
+            try {
+              await deleteDoc(docSnap.ref);
+            } catch (e) {}
           } else {
             timerDiv.innerText = `${Math.floor(timeLeft)}s`;
           }
         }, 1000);
-
-        liveTimers[docSnap.id] = interval;
       }
     });
   });
 
-  onAuthStateChanged(auth, async (user) => {
+  onAuthStateChanged(auth, (user) => {
     currentUser = user;
     renderAuthUI(user);
   });
