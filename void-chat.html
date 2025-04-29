@@ -90,7 +90,7 @@
   <div class="chat-container">
     <div id="messages"></div>
     <div class="input-group">
-      <input type="text" id="chatInput" placeholder="Enter your message..." />
+      <input type="text" id="chatInput" placeholder="Say something..." />
       <button id="sendButton">Send</button>
     </div>
   </div>
@@ -102,12 +102,13 @@
       getFirestore,
       collection,
       addDoc,
+      deleteDoc,
+      doc,
       query,
       orderBy,
       onSnapshot,
       serverTimestamp,
-      deleteDoc,
-      doc
+      Timestamp
     } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
     const firebaseConfig = {
@@ -122,43 +123,43 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
-    const messagesRef = collection(db, "globalChat");
 
+    const messagesRef = collection(db, "globalChat");
     const q = query(messagesRef, orderBy("timestamp", "desc"));
+
     const messagesDiv = document.getElementById("messages");
     const chatInput = document.getElementById("chatInput");
     const sendButton = document.getElementById("sendButton");
 
     let currentUser = null;
 
-    function renderMessage(id, data) {
-      const div = document.createElement("div");
-      div.classList.add("message");
-      const userClass = data.username === "Anonymous" ? "anon" : "user";
-      div.innerHTML = `<span class="${userClass}">${data.username}:</span> ${data.text}`;
-      messagesDiv.prepend(div);
-
-      // Auto-delete message after 30 seconds
-      setTimeout(async () => {
-        try {
-          await deleteDoc(doc(db, "globalChat", id));
-        } catch (e) {
-          console.error("Error deleting message:", e);
-        }
-      }, 30000);
-    }
-
-    onSnapshot(q, snapshot => {
+    // Show messages
+    onSnapshot(q, (snapshot) => {
       messagesDiv.innerHTML = "";
-      const now = Date.now();
-      const messages = [];
-      snapshot.forEach(doc => {
-        const data = doc.data();
-        if (data.timestamp?.toMillis && now - data.timestamp.toMillis() < 30000) {
-          messages.push({ id: doc.id, ...data });
+      const now = Timestamp.now();
+
+      snapshot.forEach(async (docSnap) => {
+        const data = docSnap.data();
+        const secondsSince = now.seconds - data.timestamp.seconds;
+
+        if (secondsSince < 30) {
+          const div = document.createElement("div");
+          div.classList.add("message");
+          const userClass = data.username === "Anonymous" ? "anon" : "user";
+          div.innerHTML = `<span class="${userClass}">${data.username}:</span> ${data.text}`;
+          messagesDiv.appendChild(div);
+
+          // Schedule delete after remaining time
+          setTimeout(() => {
+            deleteDoc(doc(db, "globalChat", docSnap.id));
+          }, (30 - secondsSince) * 1000);
+        } else {
+          // Delete expired messages
+          await deleteDoc(doc(db, "globalChat", docSnap.id));
         }
       });
-      messages.reverse().forEach(msg => renderMessage(msg.id, msg));
+
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
     });
 
     onAuthStateChanged(auth, (user) => {
@@ -169,11 +170,7 @@
       const text = chatInput.value.trim();
       if (!text) return;
 
-      let username = "Anonymous";
-      if (currentUser) {
-        const name = currentUser.displayName || currentUser.email;
-        username = name.split("@")[0];
-      }
+      const username = currentUser?.displayName || "Anonymous";
 
       await addDoc(messagesRef, {
         text,
