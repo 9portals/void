@@ -1,271 +1,65 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>The Void</title>
+  <meta charset="UTF-8">
+  <title>Login - Void</title>
   <style>
     body {
-      margin: 0;
+      background: black;
+      color: white;
       font-family: Arial, sans-serif;
-      background-color: #000;
-      color: #ccc;
       display: flex;
       flex-direction: column;
       align-items: center;
-      min-height: 100vh;
-      padding: 20px;
+      padding-top: 50px;
     }
-    h1 {
-      margin-bottom: 10px;
-    }
-    #authInfo {
-      position: absolute;
-      top: 10px;
-      right: 20px;
-      font-size: 14px;
-      color: #ccc;
-    }
-    #inputForm {
+    form {
       display: flex;
-      gap: 10px;
-      margin-bottom: 20px;
+      flex-direction: column;
+      width: 300px;
     }
     input, button {
       padding: 10px;
+      margin: 10px 0;
       background: #111;
-      color: #ccc;
       border: 1px solid #333;
-      border-radius: 5px;
-    }
-    button:hover {
-      background: #222;
-      cursor: pointer;
-    }
-    #messages {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      width: 100%;
-      max-width: 600px;
-    }
-    .message {
-      background: rgba(255, 255, 255, 0.05);
-      padding: 10px;
-      border-radius: 5px;
-      position: relative;
-    }
-    .timer {
-      position: absolute;
-      top: 5px;
-      right: 10px;
-      font-size: 12px;
-      color: #888;
-    }
-    #authControls {
-      margin-bottom: 20px;
+      color: white;
     }
   </style>
 </head>
 <body>
+  <h1>Login</h1>
+  <form id="loginForm">
+    <input type="email" id="email" placeholder="Email" required />
+    <input type="password" id="password" placeholder="Password" required />
+    <button type="submit">Login</button>
+  </form>
 
-<h1>Welcome to the Void</h1>
-<div id="authInfo"></div>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import {
+      getAuth,
+      signInWithEmailAndPassword
+    } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-<div id="authControls">
-  <input type="email" id="email" placeholder="Email" />
-  <input type="password" id="password" placeholder="Password" />
-  <input type="text" id="username" placeholder="Username (sign up only)" />
-  <button id="signupBtn">Sign Up</button>
-  <button id="loginBtn">Login</button>
-  <button id="logoutBtn" style="display: none;">Logout</button>
-</div>
+    const firebaseConfig = { /* same config as index.html */ };
 
-<form id="inputForm">
-  <input type="text" id="messageInput" placeholder="Speak into the void..." required />
-  <button type="submit">Send</button>
-</form>
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
 
-<div id="messages"></div>
+    document.getElementById("loginForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
 
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-  import {
-    getFirestore, collection, addDoc, onSnapshot,
-    deleteDoc, doc, query, orderBy, serverTimestamp,
-    getDocs, setDoc
-  } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-  import {
-    getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
-    signOut, onAuthStateChanged
-  } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+      const email = e.target.email.value.trim();
+      const password = e.target.password.value;
 
-  const firebaseConfig = {
-    apiKey: "AIzaSyD1YgjFsxh-xZfeHlrxt_0igmH6SBIMcuc",
-    authDomain: "void-d9ec4.firebaseapp.com",
-    projectId: "void-d9ec4",
-    storageBucket: "void-d9ec4.appspot.com",
-    messagingSenderId: "267268035851",
-    appId: "1:267268035851:web:d535fe4175c06f170f3e0e",
-    measurementId: "G-78DGNW8HV3"
-  };
-
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-  const auth = getAuth(app);
-
-  const messagesRef = collection(db, "voidMessages");
-  const usernamesRef = collection(db, "usernames");
-
-  const messagesDiv = document.getElementById("messages");
-  const authInfo = document.getElementById("authInfo");
-  const liveTimers = {};
-  let currentMessages = [];
-  let currentUser = null;
-  let currentUsername = "";
-
-  const updateAuthInfo = () => {
-    if (currentUser) {
-      authInfo.textContent = `Logged in as: ${currentUsername}`;
-      document.getElementById("logoutBtn").style.display = "inline-block";
-    } else {
-      authInfo.textContent = "";
-      document.getElementById("logoutBtn").style.display = "none";
-    }
-  };
-
-  onAuthStateChanged(auth, async (user) => {
-    currentUser = user;
-    if (user) {
-      const snap = await getDocs(usernamesRef);
-      snap.forEach(doc => {
-        if (doc.data().uid === user.uid) {
-          currentUsername = doc.id;
-        }
-      });
-    } else {
-      currentUsername = "";
-    }
-    updateAuthInfo();
-  });
-
-  async function sendMessage(text) {
-    if (currentMessages.length >= 10) {
-      let minTimeLeft = Infinity;
-      let messageToDelete = null;
-      const now = Date.now();
-      currentMessages.forEach(msg => {
-        const created = msg.data().created.toMillis();
-        const timeLeft = 60 - (now - created) / 1000;
-        if (timeLeft < minTimeLeft) {
-          minTimeLeft = timeLeft;
-          messageToDelete = msg;
-        }
-      });
-      if (messageToDelete) {
-        try { await deleteDoc(messageToDelete.ref); } catch (e) { }
-      }
-    }
-
-    await addDoc(messagesRef, {
-      text,
-      username: currentUsername || null,
-      created: serverTimestamp()
-    });
-  }
-
-  document.getElementById("inputForm").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const text = document.getElementById("messageInput").value.trim();
-    if (text) {
-      await sendMessage(text);
-      document.getElementById("messageInput").value = "";
-    }
-  });
-
-  onSnapshot(query(messagesRef, orderBy("created")), (snapshot) => {
-    messagesDiv.innerHTML = "";
-    const now = Date.now();
-    currentMessages = snapshot.docs;
-
-    snapshot.forEach(docSnap => {
-      const data = docSnap.data();
-      if (!data.created) return;
-
-      const createdTime = data.created.toMillis();
-      const elapsed = (now - createdTime) / 1000;
-      const remaining = 60 - elapsed;
-
-      if (remaining > 0) {
-        const div = document.createElement("div");
-        div.className = "message";
-        const timerDiv = document.createElement("div");
-        timerDiv.className = "timer";
-        timerDiv.innerText = `${Math.floor(remaining)}s`;
-
-        const userDisplay = data.username ? `<strong>${data.username}</strong>: ` : "";
-        div.innerHTML = `${userDisplay}${data.text}`;
-        div.appendChild(timerDiv);
-        messagesDiv.appendChild(div);
-
-        const interval = setInterval(async () => {
-          const timeLeft = 60 - (Date.now() - createdTime) / 1000;
-          if (timeLeft <= 0) {
-            clearInterval(interval);
-            try { await deleteDoc(docSnap.ref); } catch (e) {}
-          } else {
-            timerDiv.innerText = `${Math.floor(timeLeft)}s`;
-          }
-        }, 1000);
-
-        liveTimers[docSnap.id] = interval;
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+        window.location.href = "index.html";
+      } catch (err) {
+        alert("Login failed: " + err.message);
       }
     });
-  });
-
-  document.getElementById("signupBtn").addEventListener("click", async () => {
-    const email = document.getElementById("email").value.trim();
-    const password = document.getElementById("password").value.trim();
-    const username = document.getElementById("username").value.trim();
-
-    if (!email || !password || !username) {
-      alert("All fields are required to sign up.");
-      return;
-    }
-
-    const usernameSnap = await getDocs(usernamesRef);
-    let exists = false;
-    usernameSnap.forEach(doc => {
-      if (doc.id === username) exists = true;
-    });
-
-    if (exists) {
-      alert("Username already taken.");
-      return;
-    }
-
-    try {
-      const userCred = await createUserWithEmailAndPassword(auth, email, password);
-      await setDoc(doc(usernamesRef, username), { uid: userCred.user.uid });
-    } catch (e) {
-      alert("Sign up failed: " + e.message);
-    }
-  });
-
-  document.getElementById("loginBtn").addEventListener("click", async () => {
-    const email = document.getElementById("email").value.trim();
-    const password = document.getElementById("password").value.trim();
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-    } catch (e) {
-      alert("Login failed: " + e.message);
-    }
-  });
-
-  document.getElementById("logoutBtn").addEventListener("click", async () => {
-    await signOut(auth);
-  });
-</script>
-
+  </script>
 </body>
 </html>
