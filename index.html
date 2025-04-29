@@ -47,7 +47,6 @@
       padding: 10px;
       border-radius: 5px;
       position: relative;
-      cursor: pointer;
     }
     .timer {
       position: absolute;
@@ -58,6 +57,38 @@
     }
     .auto-message {
       cursor: pointer;
+    }
+    .moon-icon {
+      position: absolute;
+      bottom: 5px;
+      right: 10px;
+      font-size: 18px;
+      cursor: pointer;
+      color: #888;
+    }
+    .replies {
+      margin-top: 10px;
+      padding-left: 15px;
+      border-left: 1px solid #444;
+      display: none;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .reply {
+      font-size: 14px;
+      background: rgba(255, 255, 255, 0.08);
+      padding: 5px;
+      border-radius: 4px;
+    }
+    .expand-button {
+      margin-top: 5px;
+      background: #222;
+      border: none;
+      color: #aaa;
+      padding: 5px;
+      cursor: pointer;
+      font-size: 12px;
+      border-radius: 4px;
     }
   </style>
 </head>
@@ -167,7 +198,6 @@
       let minTimeLeft = Infinity;
       let messageToDelete = null;
       const now = Date.now();
-
       currentMessages.forEach(msg => {
         const created = msg.data().created.toMillis();
         const timeLeft = 60 - (now - created) / 1000;
@@ -176,7 +206,6 @@
           messageToDelete = msg;
         }
       });
-
       if (messageToDelete) {
         try {
           await deleteDoc(messageToDelete.ref);
@@ -228,8 +257,27 @@
         const timerDiv = document.createElement('div');
         timerDiv.className = 'timer';
         timerDiv.innerText = `${Math.floor(remaining)}s`;
-
         div.appendChild(timerDiv);
+
+        const moon = document.createElement('div');
+        moon.className = 'moon-icon';
+        moon.innerHTML = '🌑';
+        div.appendChild(moon);
+
+        const repliesDiv = document.createElement('div');
+        repliesDiv.className = 'replies';
+        div.appendChild(repliesDiv);
+
+        const expandButton = document.createElement('button');
+        expandButton.className = 'expand-button';
+        expandButton.innerText = 'Expand Replies';
+        expandButton.style.display = 'none';
+        div.appendChild(expandButton);
+
+        expandButton.addEventListener('click', () => {
+          repliesDiv.style.display = repliesDiv.style.display === 'none' ? 'flex' : 'none';
+        });
+
         messagesDiv.appendChild(div);
 
         const interval = setInterval(async () => {
@@ -237,6 +285,7 @@
           if (remaining <= 0) {
             clearInterval(interval);
             try { await deleteDoc(docSnap.ref); } catch (e) {}
+            div.remove();
           } else {
             timerDiv.innerText = `${Math.floor(remaining)}s`;
           }
@@ -244,11 +293,33 @@
 
         liveTimers[docSnap.id] = { interval, boost: () => { remaining += 5; timerDiv.innerText = `${Math.floor(remaining)}s`; } };
 
-        div.addEventListener('click', () => {
-          if (voidEnergy > 0) {
+        div.addEventListener('click', (e) => {
+          if (e.target !== moon && voidEnergy > 0) {
             voidEnergy -= 1;
             liveTimers[docSnap.id].boost();
             updateHarvestDisplay();
+          }
+        });
+
+        moon.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (voidEnergy >= 10 || voidLight >= 1) {
+            if (voidLight >= 1) {
+              voidLight -= 1;
+            } else {
+              voidEnergy -= 10;
+            }
+            updateHarvestDisplay();
+            const replyText = prompt("Whisper back to the void:");
+            if (replyText) {
+              const replyDiv = document.createElement('div');
+              replyDiv.className = 'reply';
+              replyDiv.textContent = replyText;
+              repliesDiv.appendChild(replyDiv);
+              expandButton.style.display = 'inline-block';
+            }
+          } else {
+            alert("Not enough Void Energy or Void Light to reply.");
           }
         });
       }
