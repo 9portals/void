@@ -47,7 +47,6 @@
       padding: 10px;
       border-radius: 5px;
       position: relative;
-      cursor: pointer;
     }
     .timer {
       position: absolute;
@@ -56,119 +55,16 @@
       font-size: 12px;
       color: #888;
     }
-    .auto-message {
-      cursor: pointer;
-    }
-    #authSection, #profileSection, #feedSection, #usersSection, #dmSection {
-  width: 100%;
-  max-width: 600px;
-  background: #111;
-  border: 1px solid #333;
-  padding: 15px;
-  margin-bottom: 20px;
-  border-radius: 8px;
-}
-
-#authSection input, #profileSection input, #feedSection input, #feedSection textarea {
-  width: 100%;
-  margin-bottom: 10px;
-}
-
-#usersList {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-#usersList li {
-  padding: 8px;
-  border-bottom: 1px solid #222;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-#dmContainer {
-  max-height: 200px;
-  overflow-y: auto;
-  background: #000;
-  padding: 10px;
-  border-radius: 5px;
-  border: 1px solid #222;
-  margin-bottom: 10px;
-}
-
   </style>
 </head>
 <body>
 
 <h1>Welcome to the Void</h1>
-<!-- ==== PART 1: USER AUTH + SOCIAL STRUCTURE PLACEHOLDERS ==== -->
-
-<!-- Auth UI -->
-<div id="authSection">
-  <div id="authForms">
-    <h2>Login / Register</h2>
-    <input type="email" id="authEmail" placeholder="Email">
-    <input type="password" id="authPassword" placeholder="Password">
-    <button id="loginBtn">Login</button>
-    <button id="registerBtn">Register</button>
-  </div>
-  <div id="userInfo" style="display: none;">
-    <p>Logged in as: <span id="userEmail"></span></p>
-    <button id="logoutBtn">Logout</button>
-  </div>
-</div>
-
-<!-- Profile Section -->
-<div id="profileSection" style="display: none;">
-  <h2>Your Profile</h2>
-  <input type="text" id="usernameInput" placeholder="Username">
-  <textarea id="bioInput" placeholder="Your bio..."></textarea>
-  <input type="file" id="profilePicInput" accept="image/*">
-  <button id="saveProfileBtn">Save Profile</button>
-  <div id="profilePreview"></div>
-</div>
-
-<!-- Feed Section -->
-<div id="feedSection" style="display: none;">
-  <h2>Feed</h2>
-  <input type="file" id="feedImageInput" accept="image/*">
-  <textarea id="feedCaption" placeholder="Say something..."></textarea>
-  <button id="postToFeedBtn">Post</button>
-  <div id="feedContainer"></div>
-</div>
-
-<!-- Users List (to follow or message) -->
-<div id="usersListSection" style="display: none;">
-  <h2>Explore Users</h2>
-  <div id="usersList"></div>
-</div>
-
-<!-- DM Section -->
-<div id="dmSection" style="display: none;">
-  <h2>Direct Messages</h2>
-  <div id="dmList"></div>
-  <div id="dmChat" style="display: none;">
-    <h3 id="dmWith"></h3>
-    <div id="dmMessages"></div>
-    <input type="text" id="dmInput" placeholder="Type a message">
-    <button id="sendDmBtn">Send</button>
-  </div>
-</div>
-
-<!-- (remove this and paste PART 2 here) -->
 
 <form id="inputForm">
   <input type="text" id="messageInput" placeholder="Speak into the void..." required>
   <button type="submit">Send</button>
 </form>
-
-<div id="harvestResults">
-  <p>Void Energy: <span id="voidEnergy">0</span></p>
-  <p>Void Light: <span id="voidLight">0</span></p>
-  <p>Void Fractals: <span id="voidFractals">0</span></p>
-</div>
 
 <div id="messages"></div>
 
@@ -193,21 +89,12 @@
   const messagesRef = collection(db, "voidMessages");
   const messagesDiv = document.getElementById('messages');
 
-  let voidEnergy = 0;
-  let voidLight = 0;
-  let voidFractals = 0;
-
   const liveTimers = {};
   let currentMessages = [];
 
-  const autoMessages = [...Array(50)].map((_, i) => `Auto Message ${i + 1}`);
-
-  function randomFromArray(arr) {
-    return arr[Math.floor(Math.random() * arr.length)];
-  }
-
   async function sendMessage(text) {
     if (currentMessages.length >= 10) {
+      // Find the message with least time left
       let minTimeLeft = Infinity;
       let messageToDelete = null;
       const now = Date.now();
@@ -245,374 +132,45 @@
     }
   });
 
-  function updateHarvestDisplay() {
-    document.getElementById('voidEnergy').textContent = voidEnergy;
-    document.getElementById('voidLight').textContent = voidLight;
-    document.getElementById('voidFractals').textContent = voidFractals;
-  }
-
   onSnapshot(query(messagesRef, orderBy('created')), (snapshot) => {
     messagesDiv.innerHTML = '';
     const now = Date.now();
-    currentMessages = snapshot.docs;
+
+    currentMessages = snapshot.docs; // update global array
 
     snapshot.forEach(docSnap => {
       const data = docSnap.data();
       if (!data.created) return;
 
       const createdTime = data.created.toMillis();
-      let elapsed = (now - createdTime) / 1000;
-      let remaining = 60 - elapsed;
+      const elapsed = (now - createdTime) / 1000;
+      const remaining = 60 - elapsed;
 
       if (remaining > 0) {
         const div = document.createElement('div');
         div.className = 'message';
-        div.innerText = data.text;
-
         const timerDiv = document.createElement('div');
         timerDiv.className = 'timer';
         timerDiv.innerText = `${Math.floor(remaining)}s`;
-        div.appendChild(timerDiv);
 
+        div.innerHTML = `${data.text}`;
+        div.appendChild(timerDiv);
         messagesDiv.appendChild(div);
 
         const interval = setInterval(async () => {
-          remaining -= 1;
-          if (remaining <= 0) {
+          const timeLeft = 60 - (Date.now() - createdTime) / 1000;
+          if (timeLeft <= 0) {
             clearInterval(interval);
             try { await deleteDoc(docSnap.ref); } catch (e) {}
           } else {
-            timerDiv.innerText = `${Math.floor(remaining)}s`;
+            timerDiv.innerText = `${Math.floor(timeLeft)}s`;
           }
         }, 1000);
 
-        liveTimers[docSnap.id] = {
-          interval,
-          boost: (amount) => {
-            remaining += amount;
-            timerDiv.innerText = `${Math.floor(remaining)}s`;
-          }
-        };
-
-        div.addEventListener('click', (e) => {
-          e.stopPropagation();
-          if (voidEnergy > 0) {
-            voidEnergy -= 1;
-            liveTimers[docSnap.id].boost(5);
-            updateHarvestDisplay();
-          } else if (voidLight > 0) {
-            voidLight -= 1;
-            liveTimers[docSnap.id].boost(300);
-            updateHarvestDisplay();
-          } else if (voidFractals > 0) {
-            voidFractals -= 1;
-            liveTimers[docSnap.id].boost(1500);
-            updateHarvestDisplay();
-          }
-        });
+        liveTimers[docSnap.id] = interval;
       }
     });
   });
-
-  // -------- Auto Message Spawner --------
-  function createAutoMessage(type) {
-    const div = document.createElement('div');
-    div.className = 'message auto-message';
-
-    let points = 0;
-    if (type === 'blue') {
-      div.style.backgroundColor = 'rgba(173, 216, 230, 0.2)';
-      div.textContent = randomFromArray(autoMessages);
-      points = Math.floor(Math.random() * 10) + 3;
-    } else if (type === 'orange') {
-      div.style.backgroundColor = 'rgba(255, 165, 0, 0.3)';
-      div.textContent = "The void stirs deeper...";
-      points = Math.floor(Math.random() * 4) + 2;
-    } else if (type === 'red') {
-      div.style.backgroundColor = 'rgba(255, 0, 0, 0.3)';
-      div.textContent = "A rare void fractal emerges...";
-      points = 1;
-    }
-
-    div.addEventListener('click', () => {
-      if (type === 'blue') voidEnergy += points;
-      if (type === 'orange') voidLight += points;
-      if (type === 'red') voidFractals += points;
-      updateHarvestDisplay();
-      div.remove();
-    });
-
-    messagesDiv.appendChild(div);
-
-    setTimeout(() => {
-      div.remove();
-    }, type === 'red' ? 10000 : 5000);
-  }
-
-  setInterval(() => {
-    createAutoMessage('blue');
-  }, Math.random() * 15000 + 15000);
-
-  setInterval(() => {
-    createAutoMessage('orange');
-  }, 10 * 60 * 1000);
-
-  setInterval(() => {
-    createAutoMessage('red');
-  }, Math.random() * 1800000 + 1800000);
-// ==== PART 2: AUTH + PROFILE JS ====
-
-import {
-  getAuth,
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged
-} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import {
-  ref as storageRef,
-  getStorage,
-  uploadBytes,
-  getDownloadURL
-} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
-
-const auth = getAuth(app);
-const storage = getStorage(app);
-const usersCollection = collection(db, "users");
-let currentUserId = null;
-
-const authSection = document.getElementById("authSection");
-const authForms = document.getElementById("authForms");
-const userInfo = document.getElementById("userInfo");
-const userEmailSpan = document.getElementById("userEmail");
-
-document.getElementById("loginBtn").onclick = async () => {
-  const email = document.getElementById("authEmail").value;
-  const password = document.getElementById("authPassword").value;
-  try {
-    await signInWithEmailAndPassword(auth, email, password);
-  } catch (e) {
-    alert("Login failed: " + e.message);
-  }
-};
-
-document.getElementById("registerBtn").onclick = async () => {
-  const email = document.getElementById("authEmail").value;
-  const password = document.getElementById("authPassword").value;
-  try {
-    await createUserWithEmailAndPassword(auth, email, password);
-  } catch (e) {
-    alert("Registration failed: " + e.message);
-  }
-};
-
-document.getElementById("logoutBtn").onclick = async () => {
-  await signOut(auth);
-};
-
-// Handle login state changes
-onAuthStateChanged(auth, async (user) => {
-  if (user) {
-    currentUserId = user.uid;
-    userInfo.style.display = "block";
-    authForms.style.display = "none";
-    userEmailSpan.textContent = user.email;
-    document.getElementById("profileSection").style.display = "block";
-    document.getElementById("feedSection").style.display = "block";
-    document.getElementById("usersListSection").style.display = "block";
-    document.getElementById("dmSection").style.display = "block";
-    loadUserProfile();
-    loadUsersList();
-    loadFeed();
-  } else {
-    currentUserId = null;
-    userInfo.style.display = "none";
-    authForms.style.display = "block";
-    document.getElementById("profileSection").style.display = "none";
-    document.getElementById("feedSection").style.display = "none";
-    document.getElementById("usersListSection").style.display = "none";
-    document.getElementById("dmSection").style.display = "none";
-  }
-});
-
-// Save profile
-document.getElementById("saveProfileBtn").onclick = async () => {
-  const username = document.getElementById("usernameInput").value.trim();
-  const bio = document.getElementById("bioInput").value.trim();
-  const file = document.getElementById("profilePicInput").files[0];
-  let profilePicURL = "";
-
-  if (file) {
-    const picRef = storageRef(storage, `profiles/${currentUserId}/avatar`);
-    await uploadBytes(picRef, file);
-    profilePicURL = await getDownloadURL(picRef);
-  }
-
-  await setDoc(doc(usersCollection, currentUserId), {
-    username,
-    bio,
-    profilePicURL
-  });
-
-  loadUserProfile();
-};
-
-// Load current profile
-async function loadUserProfile() {
-  const docSnap = await getDoc(doc(usersCollection, currentUserId));
-  if (docSnap.exists()) {
-    const data = docSnap.data();
-    const preview = document.getElementById("profilePreview");
-    preview.innerHTML = `
-      <p><strong>@${data.username}</strong></p>
-      <p>${data.bio}</p>
-      ${data.profilePicURL ? `<img src="${data.profilePicURL}" style="width:100px;border-radius:50%">` : ""}
-    `;
-  }
-}
-// ==== PART 3: FEED POSTING AND LOADING ====
-
-const feedPostsCollection = collection(db, "feedPosts");
-
-document.getElementById("postToFeedBtn").onclick = async () => {
-  const caption = document.getElementById("feedCaption").value.trim();
-  const file = document.getElementById("feedImageInput").files[0];
-  if (!caption && !file) return alert("Add a caption or an image");
-
-  let imageURL = "";
-  if (file) {
-    const imageRef = storageRef(storage, `feed/${currentUserId}/${Date.now()}`);
-    await uploadBytes(imageRef, file);
-    imageURL = await getDownloadURL(imageRef);
-  }
-
-  await addDoc(feedPostsCollection, {
-    userId: currentUserId,
-    caption,
-    imageURL,
-    created: serverTimestamp()
-  });
-
-  document.getElementById("feedCaption").value = "";
-  document.getElementById("feedImageInput").value = "";
-  loadFeed();
-};
-
-async function loadFeed() {
-  const q = query(feedPostsCollection, orderBy("created", "desc"));
-  const snap = await getDocs(q);
-  const feedDiv = document.getElementById("feedContainer");
-  feedDiv.innerHTML = "";
-
-  for (const docSnap of snap.docs) {
-    const post = docSnap.data();
-    const userDoc = await getDoc(doc(usersCollection, post.userId));
-    const user = userDoc.exists() ? userDoc.data() : { username: "Unknown" };
-
-    const postEl = document.createElement("div");
-    postEl.style.border = "1px solid #444";
-    postEl.style.padding = "10px";
-    postEl.style.margin = "10px 0";
-    postEl.style.background = "#111";
-
-    postEl.innerHTML = `
-      <strong>@${user.username || "anon"}</strong>
-      <p>${post.caption || ""}</p>
-      ${post.imageURL ? `<img src="${post.imageURL}" style="max-width:100%; border-radius:8px;">` : ""}
-      <small>${post.created?.toDate().toLocaleString() || ""}</small>
-    `;
-
-    feedDiv.appendChild(postEl);
-  }
-}
-// ==== PART 4: USER LIST, FOLLOWING + DMs ====
-
-const followsCollection = collection(db, "follows");
-const dmMessagesCollection = collection(db, "dmMessages");
-
-async function loadUsersList() {
-  const snap = await getDocs(usersCollection);
-  const usersList = document.getElementById("usersList");
-  usersList.innerHTML = "";
-
-  snap.docs.forEach(docSnap => {
-    if (docSnap.id === currentUserId) return;
-
-    const user = docSnap.data();
-    const userEl = document.createElement("li");
-    userEl.innerHTML = `
-      <span style="cursor:pointer; color:#0af;" data-uid="${docSnap.id}">
-        @${user.username || "anon"}
-      </span>
-      <button data-follow="${docSnap.id}">Follow</button>
-      <button data-dm="${docSnap.id}">DM</button>
-    `;
-
-    usersList.appendChild(userEl);
-  });
-
-  // Handle follow
-  usersList.querySelectorAll("button[data-follow]").forEach(btn => {
-    btn.onclick = async () => {
-      const targetId = btn.getAttribute("data-follow");
-      await addDoc(followsCollection, {
-        followerId: currentUserId,
-        followingId: targetId
-      });
-      alert("Followed!");
-    };
-  });
-
-  // Handle DM click
-  usersList.querySelectorAll("button[data-dm]").forEach(btn => {
-    btn.onclick = () => {
-      const targetId = btn.getAttribute("data-dm");
-      loadDMChat(targetId);
-    };
-  });
-}
-
-// Send a DM
-document.getElementById("sendDmBtn").onclick = async () => {
-  const msg = document.getElementById("dmInput").value.trim();
-  const toId = document.getElementById("dmSection").getAttribute("data-target");
-  if (!msg || !toId) return;
-
-  await addDoc(dmMessagesCollection, {
-    from: currentUserId,
-    to: toId,
-    text: msg,
-    created: serverTimestamp()
-  });
-
-  document.getElementById("dmInput").value = "";
-  loadDMChat(toId);
-};
-
-// Load DM chat between current user and target
-async function loadDMChat(targetId) {
-  document.getElementById("dmSection").setAttribute("data-target", targetId);
-
-  const q = query(dmMessagesCollection, orderBy("created", "asc"));
-  const snap = await getDocs(q);
-  const container = document.getElementById("dmContainer");
-  container.innerHTML = "";
-
-  snap.docs.forEach(docSnap => {
-    const msg = docSnap.data();
-    if (
-      (msg.from === currentUserId && msg.to === targetId) ||
-      (msg.from === targetId && msg.to === currentUserId)
-    ) {
-      const el = document.createElement("div");
-      el.style.padding = "4px";
-      el.style.borderBottom = "1px solid #333";
-      el.innerHTML = `<strong>${msg.from === currentUserId ? "You" : "Them"}:</strong> ${msg.text}`;
-      container.appendChild(el);
-    }
-  });
-}
-
 </script>
 
 </body>
