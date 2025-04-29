@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>View Profiles - Void</title>
+  <style>
+    body {
+      background-color: #000;
+      color: #ccc;
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+
+    header {
+      width: 100%;
+      padding: 15px 20px;
+      background-color: #111;
+      color: #eee;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #333;
+    }
+
+    h1 {
+      margin: 0;
+      cursor: pointer;
+    }
+
+    .profile-list {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      max-width: 600px;
+      margin: 50px auto;
+      padding: 0 20px;
+    }
+
+    .profile-card {
+      background-color: #111;
+      border: 1px solid #333;
+      padding: 15px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      cursor: pointer;
+    }
+
+    .profile-card:hover {
+      background-color: #1a1a1a;
+    }
+
+    .profile-pic {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid #444;
+    }
+
+    .status-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 8px;
+    }
+
+    .online {
+      background-color: green;
+    }
+
+    .offline {
+      background-color: red;
+    }
+
+    .profile-name {
+      font-size: 18px;
+    }
+
+    .click-disabled {
+      pointer-events: none;
+      opacity: 0.6;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1 onclick="window.location.href='index.html'">Void</h1>
+  </header>
+
+  <div class="profile-list" id="profileList"></div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, collection, getDocs, doc, getDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyD1YgjFsxh-xZfeHlrxt_0igmH6SBIMcuc",
+      authDomain: "void-d9ec4.firebaseapp.com",
+      projectId: "void-d9ec4",
+      storageBucket: "void-d9ec4.appspot.com",
+      messagingSenderId: "267268035851",
+      appId: "1:267268035851:web:d535fe4175c06f170f3e0e"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+
+    const profileList = document.getElementById("profileList");
+
+    let currentUser = null;
+
+    function timeAgo(timestamp) {
+      const diff = (Date.now() - timestamp) / 1000;
+      if (diff < 60) return "just now";
+      const minutes = Math.floor(diff / 60);
+      return `${minutes}m ago`;
+    }
+
+    onAuthStateChanged(auth, async (user) => {
+      currentUser = user;
+
+      const usersSnap = await getDocs(collection(db, "users"));
+      const users = [];
+
+      usersSnap.forEach(doc => {
+        const data = doc.data();
+        if (data.username) {
+          users.push({ id: doc.id, ...data });
+        }
+      });
+
+      users.sort((a, b) => {
+        const aOnline = a.online || false;
+        const bOnline = b.online || false;
+        if (aOnline === bOnline) {
+          return (b.lastSeen || 0) - (a.lastSeen || 0);
+        }
+        return bOnline - aOnline;
+      });
+
+      users.forEach(profile => {
+        const div = document.createElement("div");
+        div.className = "profile-card";
+        if (!currentUser) div.classList.add("click-disabled");
+
+        const statusDot = document.createElement("span");
+        statusDot.className = "status-dot " + (profile.online ? "online" : "offline");
+
+        const pic = document.createElement("img");
+        pic.className = "profile-pic";
+        pic.src = profile.profilePicture || "https://via.placeholder.com/50";
+
+        const text = document.createElement("div");
+        text.innerHTML = `<div class="profile-name">${statusDot.outerHTML}${profile.username}</div>`;
+
+        div.appendChild(pic);
+        div.appendChild(text);
+        div.onclick = () => {
+          if (currentUser) {
+            window.location.href = `profile.html?id=${profile.id}`;
+          }
+        };
+        profileList.appendChild(div);
+      });
+    });
+  </script>
+</body>
+</html>
