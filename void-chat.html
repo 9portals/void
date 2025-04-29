@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Void Chat</title>
+  <style>
+    body {
+      background-color: #000;
+      color: #ccc;
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+
+    header {
+      width: 100%;
+      padding: 15px 20px;
+      background-color: #111;
+      color: #eee;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #333;
+    }
+
+    h1 {
+      margin: 0;
+      cursor: pointer;
+    }
+
+    .chat-container {
+      max-width: 700px;
+      margin: 50px auto;
+      padding: 0 20px;
+    }
+
+    #messages {
+      height: 400px;
+      background: #111;
+      border: 1px solid #444;
+      padding: 10px;
+      overflow-y: auto;
+      margin-bottom: 10px;
+      border-radius: 5px;
+    }
+
+    .message {
+      margin-bottom: 10px;
+    }
+
+    .message .user {
+      color: #0f0;
+    }
+
+    .message .anon {
+      color: #888;
+    }
+
+    #chatInput {
+      width: calc(100% - 90px);
+      padding: 10px;
+      font-size: 16px;
+      background-color: #222;
+      border: 1px solid #555;
+      color: #ccc;
+      border-radius: 4px;
+    }
+
+    #sendButton {
+      width: 70px;
+      padding: 10px;
+      background-color: #333;
+      color: #ccc;
+      border: 1px solid #666;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+
+    #sendButton:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .input-group {
+      display: flex;
+      gap: 10px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1 onclick="window.location.href='index.html'">Void</h1>
+  </header>
+
+  <div class="chat-container">
+    <div id="messages"></div>
+    <div class="input-group">
+      <input type="text" id="chatInput" placeholder="Enter your message..." />
+      <button id="sendButton">Send</button>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import {
+      getFirestore,
+      collection,
+      addDoc,
+      query,
+      orderBy,
+      onSnapshot,
+      serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyD1YgjFsxh-xZfeHlrxt_0igmH6SBIMcuc",
+      authDomain: "void-d9ec4.firebaseapp.com",
+      projectId: "void-d9ec4",
+      storageBucket: "void-d9ec4.appspot.com",
+      messagingSenderId: "267268035851",
+      appId: "1:267268035851:web:d535fe4175c06f170f3e0e"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    const messagesRef = collection(db, "globalChat");
+    const q = query(messagesRef, orderBy("timestamp", "desc"));
+
+    const messagesDiv = document.getElementById("messages");
+    const chatInput = document.getElementById("chatInput");
+    const sendButton = document.getElementById("sendButton");
+
+    let currentUser = null;
+    let lastSent = 0;
+
+    function renderMessage(data) {
+      const div = document.createElement("div");
+      div.classList.add("message");
+      const userClass = data.username === "Anonymous" ? "anon" : "user";
+      div.innerHTML = `<span class="${userClass}">${data.username}:</span> ${data.text}`;
+      messagesDiv.prepend(div);
+    }
+
+    onSnapshot(q, snapshot => {
+      messagesDiv.innerHTML = "";
+      snapshot.forEach(doc => {
+        renderMessage(doc.data());
+      });
+    });
+
+    onAuthStateChanged(auth, (user) => {
+      currentUser = user;
+    });
+
+    sendButton.addEventListener("click", async () => {
+      const text = chatInput.value.trim();
+      if (!text) return;
+
+      const now = Date.now();
+      if (now - lastSent < 60000) {
+        alert("You can only send a message once every 60 seconds.");
+        return;
+      }
+
+      lastSent = now;
+
+      const username = currentUser?.displayName || "Anonymous";
+
+      await addDoc(messagesRef, {
+        text,
+        username,
+        timestamp: serverTimestamp()
+      });
+
+      chatInput.value = "";
+    });
+
+    chatInput.addEventListener("keypress", (e) => {
+      if (e.key === "Enter") {
+        sendButton.click();
+      }
+    });
+  </script>
+</body>
+</html>
