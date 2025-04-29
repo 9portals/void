@@ -2,59 +2,52 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>The Void</title>
   <style>
     body {
       margin: 0;
       font-family: Arial, sans-serif;
-      background-color: black;
-      color: white;
+      background: black;
+      color: #ccc;
       text-align: center;
     }
-
     header {
       padding: 20px;
-      background-color: #111;
-      font-size: 32px;
-      font-weight: bold;
+      background: #111;
+      font-size: 24px;
     }
-
     nav {
-      display: flex;
-      justify-content: center;
-      gap: 20px;
-      background-color: #222;
-      padding: 10px 0;
+      margin: 20px;
     }
-
-    nav a, nav button {
-      color: white;
-      background: none;
-      border: none;
-      font-size: 16px;
+    nav a {
+      margin: 0 10px;
+      color: #ccc;
       text-decoration: none;
-      cursor: pointer;
+      border: 1px solid #444;
+      padding: 8px 16px;
+      border-radius: 5px;
     }
-
-    nav a:hover, nav button:hover {
-      text-decoration: underline;
-    }
-
-    .content {
-      margin-top: 50px;
+    nav a:hover {
+      background: #222;
     }
   </style>
 </head>
 <body>
-  <header onclick="window.location.href='index.html'">Void</header>
-  <nav id="nav-links">
-    <!-- Links will be injected here -->
+
+  <header>
+    <a href="index.html" style="color: inherit; text-decoration: none;">Void</a>
+  </header>
+
+  <nav id="navLinks">
+    <a href="login.html">Login</a>
+    <a href="signup.html">Sign Up</a>
   </nav>
-  <div class="content">
+
+  <main>
     <h2>Welcome to the Void</h2>
-    <p>More content coming soon...</p>
-  </div>
+    <p>Chat, connect, or vanish into nothingness...</p>
+  </main>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -66,38 +59,23 @@
       projectId: "void-d9ec4",
       storageBucket: "void-d9ec4.appspot.com",
       messagingSenderId: "267268035851",
-      appId: "1:267268035851:web:d535fe4175c06f170f3e0e"
+      appId: "1:267268035851:web:d535fe4175c06f170f3e0e",
     };
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
 
-    const nav = document.getElementById('nav-links');
+    const nav = document.getElementById("navLinks");
 
-    onAuthStateChanged(auth, user => {
-      nav.innerHTML = '';
-      if (user) {
-        const logoutBtn = document.createElement('button');
-        logoutBtn.textContent = 'Logout';
-        logoutBtn.onclick = () => signOut(auth);
-
-        const editProfileLink = document.createElement('a');
-        editProfileLink.href = 'edit-profile.html';
-        editProfileLink.textContent = 'Edit Profile';
-
-        nav.appendChild(editProfileLink);
-        nav.appendChild(logoutBtn);
-      } else {
-        const loginLink = document.createElement('a');
-        loginLink.href = 'login.html';
-        loginLink.textContent = 'Login';
-
-        const signupLink = document.createElement('a');
-        signupLink.href = 'signup.html';
-        signupLink.textContent = 'Sign Up';
-
-        nav.appendChild(loginLink);
-        nav.appendChild(signupLink);
+    onAuthStateChanged(auth, (user) => {
+      if (user && user.emailVerified) {
+        nav.innerHTML = `
+          <a href="edit-profile.html">Edit Profile</a>
+          <a href="#" id="logoutBtn">Logout</a>
+        `;
+        document.getElementById("logoutBtn")?.addEventListener("click", () => {
+          signOut(auth).then(() => location.reload());
+        });
       }
     });
   </script>
