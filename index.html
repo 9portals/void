@@ -56,13 +56,6 @@
       font-size: 12px;
       color: #888;
     }
-    .reply {
-      margin-top: 8px;
-      margin-left: 20px;
-      background: rgba(255, 255, 255, 0.03);
-      padding: 8px;
-      border-radius: 5px;
-    }
     .auto-message {
       cursor: pointer;
     }
@@ -88,7 +81,7 @@
 <!-- Firebase SDK -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-  import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, query, orderBy, serverTimestamp, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+  import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyD1YgjFsxh-xZfeHlrxt_0igmH6SBIMcuc",
@@ -145,8 +138,7 @@
 
     await addDoc(messagesRef, {
       text,
-      created: serverTimestamp(),
-      replies: []
+      created: serverTimestamp()
     });
   }
 
@@ -181,27 +173,12 @@
       if (remaining > 0) {
         const div = document.createElement('div');
         div.className = 'message';
-        const moon = document.createElement('span');
-        moon.innerText = "🜄 ";
-        div.prepend(moon);
-
-        const textDiv = document.createElement('span');
-        textDiv.innerText = data.text;
-        div.appendChild(textDiv);
+        div.innerText = data.text;
 
         const timerDiv = document.createElement('div');
         timerDiv.className = 'timer';
         timerDiv.innerText = `${Math.floor(remaining)}s`;
         div.appendChild(timerDiv);
-
-        if (data.replies) {
-          data.replies.forEach(reply => {
-            const replyDiv = document.createElement('div');
-            replyDiv.className = 'reply';
-            replyDiv.innerText = reply;
-            div.appendChild(replyDiv);
-          });
-        }
 
         messagesDiv.appendChild(div);
 
@@ -223,37 +200,19 @@
           }
         };
 
-        div.addEventListener('click', async (e) => {
+        div.addEventListener('click', (e) => {
           e.stopPropagation();
           if (voidEnergy > 0) {
             voidEnergy -= 1;
-            liveTimers[docSnap.id].boost(5); // +5 seconds per energy
+            liveTimers[docSnap.id].boost(5);
             updateHarvestDisplay();
           } else if (voidLight > 0) {
             voidLight -= 1;
-            liveTimers[docSnap.id].boost(300); // +5 minutes per light
+            liveTimers[docSnap.id].boost(300);
             updateHarvestDisplay();
           } else if (voidFractals > 0) {
             voidFractals -= 1;
-            liveTimers[docSnap.id].boost(1500); // +25 minutes per fractal
-            updateHarvestDisplay();
-          } else if (confirm("Spend 10 Void Energy, 1 Light or 1 Fractal to reply?")) {
-            if (voidEnergy >= 10) {
-              voidEnergy -= 10;
-            } else if (voidLight >= 1) {
-              voidLight -= 1;
-            } else if (voidFractals >= 1) {
-              voidFractals -= 1;
-            } else {
-              alert("Not enough resources!");
-              return;
-            }
-            const replyText = prompt("Speak your reply into the void:");
-            if (replyText) {
-              await updateDoc(doc(docSnap.ref), {
-                replies: arrayUnion(replyText)
-              });
-            }
+            liveTimers[docSnap.id].boost(1500);
             updateHarvestDisplay();
           }
         });
