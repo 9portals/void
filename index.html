@@ -1,49 +1,59 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>The Void</title>
   <style>
     body {
       margin: 0;
       font-family: Arial, sans-serif;
-      background-color: #000;
-      color: #ccc;
-      padding-top: 60px;
+      background-color: black;
+      color: white;
+      text-align: center;
     }
+
     header {
-      position: fixed;
-      top: 0;
-      width: 100%;
-      background: #111;
-      padding: 15px 20px;
+      padding: 20px;
+      background-color: #111;
+      font-size: 32px;
+      font-weight: bold;
+    }
+
+    nav {
       display: flex;
-      justify-content: space-between;
-      align-items: center;
-      z-index: 100;
+      justify-content: center;
+      gap: 20px;
+      background-color: #222;
+      padding: 10px 0;
     }
-    .nav-links a {
-      color: #ccc;
+
+    nav a, nav button {
+      color: white;
+      background: none;
+      border: none;
+      font-size: 16px;
       text-decoration: none;
-      margin-left: 15px;
+      cursor: pointer;
     }
-    .nav-links a:hover {
+
+    nav a:hover, nav button:hover {
       text-decoration: underline;
+    }
+
+    .content {
+      margin-top: 50px;
     }
   </style>
 </head>
 <body>
-  <header>
-    <h1><a href="index.html" style="color: #ccc; text-decoration: none;">Void</a></h1>
-    <div class="nav-links" id="navLinks">
-      <a href="login.html">Login</a>
-      <a href="signup.html">Sign Up</a>
-    </div>
-  </header>
-
-  <div style="padding: 20px;">
-    <p>Welcome to the Void. This is the homepage.</p>
+  <header onclick="window.location.href='index.html'">Void</header>
+  <nav id="nav-links">
+    <!-- Links will be injected here -->
+  </nav>
+  <div class="content">
+    <h2>Welcome to the Void</h2>
+    <p>More content coming soon...</p>
   </div>
 
   <script type="module">
@@ -62,16 +72,32 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
 
-    const nav = document.getElementById("navLinks");
-    onAuthStateChanged(auth, (user) => {
+    const nav = document.getElementById('nav-links');
+
+    onAuthStateChanged(auth, user => {
+      nav.innerHTML = '';
       if (user) {
-        nav.innerHTML = `
-          <a href="edit-profile.html">Edit Profile</a>
-          <a href="#" id="logoutBtn">Logout</a>
-        `;
-        document.getElementById('logoutBtn').addEventListener('click', () => {
-          signOut(auth);
-        });
+        const logoutBtn = document.createElement('button');
+        logoutBtn.textContent = 'Logout';
+        logoutBtn.onclick = () => signOut(auth);
+
+        const editProfileLink = document.createElement('a');
+        editProfileLink.href = 'edit-profile.html';
+        editProfileLink.textContent = 'Edit Profile';
+
+        nav.appendChild(editProfileLink);
+        nav.appendChild(logoutBtn);
+      } else {
+        const loginLink = document.createElement('a');
+        loginLink.href = 'login.html';
+        loginLink.textContent = 'Login';
+
+        const signupLink = document.createElement('a');
+        signupLink.href = 'signup.html';
+        signupLink.textContent = 'Sign Up';
+
+        nav.appendChild(loginLink);
+        nav.appendChild(signupLink);
       }
     });
   </script>
