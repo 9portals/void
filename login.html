@@ -1,48 +1,30 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8" />
   <title>Login</title>
   <style>
     body {
-      background-color: #000;
-      color: #ccc;
-      font-family: Arial;
-      padding: 50px;
+      background: black;
+      color: white;
+      font-family: sans-serif;
+      text-align: center;
+      padding-top: 60px;
     }
-    form {
-      max-width: 400px;
-      margin: auto;
-    }
-    input {
-      display: block;
-      margin-bottom: 15px;
+    input, button {
+      margin: 10px;
       padding: 10px;
-      width: 100%;
-      background: #111;
-      border: 1px solid #333;
-      color: #ccc;
-    }
-    button {
-      padding: 10px;
-      background: #222;
-      border: none;
-      color: #ccc;
-      cursor: pointer;
-    }
-    .error {
-      color: red;
+      width: 250px;
     }
   </style>
 </head>
 <body>
   <h2>Login</h2>
   <form id="loginForm">
-    <input type="email" id="email" placeholder="Email" required />
-    <input type="password" id="password" placeholder="Password" required />
+    <input type="email" id="email" placeholder="Email" required><br>
+    <input type="password" id="password" placeholder="Password" required><br>
     <button type="submit">Login</button>
-    <div class="error" id="errorMsg"></div>
   </form>
+  <p id="message"></p>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -63,14 +45,18 @@
     document.getElementById("loginForm").addEventListener("submit", async (e) => {
       e.preventDefault();
       const email = document.getElementById("email").value.trim();
-      const password = document.getElementById("password").value.trim();
-      const errorMsg = document.getElementById("errorMsg");
+      const password = document.getElementById("password").value;
+      const msg = document.getElementById("message");
 
       try {
-        await signInWithEmailAndPassword(auth, email, password);
+        const cred = await signInWithEmailAndPassword(auth, email, password);
+        if (!cred.user.emailVerified) {
+          msg.innerText = "Please verify your email first.";
+          return;
+        }
         window.location.href = "index.html";
-      } catch (error) {
-        errorMsg.textContent = error.message;
+      } catch (err) {
+        msg.innerText = "Wrong username or password.";
       }
     });
   </script>
